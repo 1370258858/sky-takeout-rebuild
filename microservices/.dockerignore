@@ -1,0 +1,20 @@
+# VCS and editor files
+.git
+.gitignore
+**/.git
+**/.idea
+**/.vscode
+
+# Local runtime data (very large)
+mysql_data/
+redis_data/
+rabbitmq_data/
+
+# Build outputs and logs
+**/bin/
+**/dist/
+**/tmp/
+**/*.log
+
+# Misc
+**/.DS_Store
