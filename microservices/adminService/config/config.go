@@ -2,6 +2,10 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
+	"strings"
+
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -13,8 +17,10 @@ func InitLoadConfig() *AllConfig {
 	pflag.Parse()
 
 	config := viper.New()
-	// 设置读取路径
-	config.AddConfigPath("./config")
+	// 兼容不同启动目录，优先在 adminService 内查找配置文件。
+	for _, p := range candidateConfigPaths() {
+		config.AddConfigPath(p)
+	}
 	// 设置读取文件名字
 	config.SetConfigName(fmt.Sprintf("application-%s", *envPtr))
 	// 设置读取文件类型
@@ -34,6 +40,36 @@ func InitLoadConfig() *AllConfig {
 	// 打印配置文件信息
 	fmt.Printf("配置文件信息：%+v", configData)
 	return configData
+}
+
+func candidateConfigPaths() []string {
+	paths := []string{
+		"./config",
+		"../config",
+		"../../config",
+		"../../../config",
+		"../../../../config",
+	}
+
+	if _, file, _, ok := runtime.Caller(0); ok {
+		paths = append(paths, filepath.Dir(file))
+	}
+
+	seen := make(map[string]struct{}, len(paths))
+	unique := make([]string, 0, len(paths))
+	for _, p := range paths {
+		cleaned := filepath.Clean(strings.TrimSpace(p))
+		if cleaned == "" {
+			continue
+		}
+		if _, exists := seen[cleaned]; exists {
+			continue
+		}
+		seen[cleaned] = struct{}{}
+		unique = append(unique, cleaned)
+	}
+
+	return unique
 }
 
 // AllConfig 整合Config
