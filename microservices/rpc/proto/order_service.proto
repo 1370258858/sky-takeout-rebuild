@@ -4,18 +4,57 @@ package order.v1;
 
 option go_package = "microservices/rpc/proto/order/v1;orderv1";
 
-service OrderService {
-  rpc GetGoodById(GetGoodByIdRequest) returns (GetGoodByIdResponse);
+import "google/protobuf/timestamp.proto";
 
+service Order {
+	rpc GetOrderById(GetOrderByIdRequest) returns (GetOrderByIdResponse);
+	rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
 }
 
-
-message GetGoodByIdRequest {
-  int64 user_id = 1;
+message OrderDetail  {
+	uint64 id = 1;
+	string number = 2;
+	int32 status = 3;
+	uint64 user_id = 4;
+	uint64 address_book_id = 5;
+	google.protobuf.Timestamp order_time = 6;
+	google.protobuf.Timestamp checkout_time = 7;
+	int32 pay_method = 8;
+	int32 pay_status = 9;
+	double amount = 10;
+	string remark = 11;
+	string phone = 12;
+	string address = 13;
+	string user_name = 14;
+	string consignee = 15;
+	string cancel_reason = 16;
+	string rejection_reason = 17;
+	google.protobuf.Timestamp cancel_time = 18;
+	google.protobuf.Timestamp estimated_delivery_at = 19;
+	int32 delivery_status = 20;
+	google.protobuf.Timestamp delivery_time = 21;
+	int32 pack_amount = 22;
+	int32 tableware_number = 23;
+	int32 tableware_status = 24;
 }
 
-message GetGoodByIdResponse {
-  int64 user_id = 1;
-  int64 order_count = 2;
-  string status = 3;
+message GetOrderByIdRequest {
+	uint64 id = 1;
 }
+
+message GetOrderByIdResponse {
+	OrderDetail  order = 1;
+}
+
+message ListOrdersRequest {
+	uint64 user_id = 1;
+	optional int32 status = 2;
+	int32 page = 3;
+	int32 page_size = 4;
+}
+
+message ListOrdersResponse {
+	repeated OrderDetail  items = 1;
+	int64 total = 2;
+}
+

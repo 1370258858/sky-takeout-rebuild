@@ -4,6 +4,34 @@ package goods.v1;
 
 option go_package = "microservices/rpc/proto/goods/v1;goodsv1";
 
-service GoodsService {
+service Goods {
+  rpc GetGoodById(GetGoodByIdRequest) returns (GetGoodByIdResponse);
 
+}
+
+
+message GetGoodByIdRequest {
+  int64 id = 1;
+}
+
+message GetGoodByIdResponse {
+  int64 id = 1;
+  string name = 2;
+  int64 dish_id = 3;
+  double price = 4;
+  string image = 5;
+  string description = 6;
+  int32 status = 7;
+  int64 create_time = 8;
+  int64 update_time = 9;
+  int64 create_user = 10;
+  int64 update_user = 11;
+  repeated DishFlavor flavors = 12;
+}
+
+message DishFlavor {
+  int64 id = 1;
+  int64 dish_id = 2;
+  string name = 3;
+  string value = 4;
 }

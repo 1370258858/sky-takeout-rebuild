@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -18,10 +17,9 @@ import (
 	"sky-takeout/microservices/goodsService/internal/controller"
 	"sky-takeout/microservices/goodsService/internal/handler"
 	"sky-takeout/microservices/goodsService/internal/repository/dao"
-	rpcclient "sky-takeout/microservices/goodsService/internal/rpc/client"
-	goodsv1 "sky-takeout/microservices/goodsService/internal/rpc/pb"
-	rpcserver "sky-takeout/microservices/goodsService/internal/rpc/server"
+	goodsrpcserver "sky-takeout/microservices/goodsService/internal/rpc/server"
 	"sky-takeout/microservices/goodsService/internal/service"
+	goodsrpcv1 "sky-takeout/microservices/rpc/pb/goodsv1"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -35,28 +33,9 @@ func main() {
 		}
 	}()
 
+	// Initialize Gin router and HTTP server.
 	r := gin.Default()
 	r.GET("/healthz", handler.Health)
-
-	orderClient, err := rpcclient.NewOrderRPCClientFromEnv()
-	if err != nil {
-		log.Fatalf("goodsService connect orderService grpc error: %v", err)
-	}
-	defer func() {
-		if err := orderClient.Close(); err != nil {
-			log.Printf("goodsService close order grpc conn error: %v", err)
-		}
-	}()
-
-	r.GET("/goods/rpc/order/summary", func(c *gin.Context) {
-		userID, _ := strconv.ParseInt(c.DefaultQuery("userId", "0"), 10, 64)
-		resp, err := orderClient.GetOrderSummary(c.Request.Context(), userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, resp)
-	})
 
 	api := r.Group("/goods")
 	dishCtrl := controller.NewDishController(
@@ -66,7 +45,14 @@ func main() {
 
 	addr := ":18083"
 	server := &http.Server{Addr: addr, Handler: r}
+	go func() {
+		log.Printf("goodsService listening on %s (gin mode)", addr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("goodsService serve error: %v", err)
+		}
+	}()
 
+	// Initialize gRPC server.
 	grpcAddr := os.Getenv("GOODS_SERVICE_GRPC_ADDR")
 	if strings.TrimSpace(grpcAddr) == "" {
 		grpcAddr = ":19083"
@@ -76,14 +62,7 @@ func main() {
 		log.Fatalf("goodsService listen grpc error: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	goodsv1.RegisterGoodsServiceServer(grpcServer, rpcserver.NewGoodsRPCServer())
-
-	go func() {
-		log.Printf("goodsService listening on %s (gin mode)", addr)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("goodsService serve error: %v", err)
-		}
-	}()
+	goodsrpcv1.RegisterGoodsServer(grpcServer, goodsrpcserver.NewGoodsRPCServer())
 
 	go func() {
 		log.Printf("goodsService grpc listening on %s", grpcAddr)
