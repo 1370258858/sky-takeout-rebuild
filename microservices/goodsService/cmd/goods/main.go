@@ -11,6 +11,11 @@ import (
 	"time"
 
 	"sky-takeout/microservices/goodsService/common"
+	"sky-takeout/microservices/goodsService/internal/handler"
+	"sky-takeout/microservices/goodsService/global"
+	"sky-takeout/microservices/goodsService/internal/controller"
+	"sky-takeout/microservices/goodsService/internal/repository/dao"
+	"sky-takeout/microservices/goodsService/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,12 +29,13 @@ func main() {
 	}()
 
 	r := gin.Default()
-	r.GET("/healthz", func(c *gin.Context) {
-		c.JSON(http.StatusOK, map[string]any{
-			"service": "goodsService",
-			"status":  "ok",
-		})
-	})
+	r.GET("/healthz", handler.Health)
+
+	api := r.Group("/goods")
+	dishCtrl := controller.NewDishController(
+		service.NewDishService(dao.NewDishDao(global.DB)),
+	)
+	dishCtrl.InitApiRouter(api)
 
 	addr := ":18083"
 	server := &http.Server{Addr: addr, Handler: r}

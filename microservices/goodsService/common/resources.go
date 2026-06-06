@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sky-takeout/microservices/goodsService/global"
 	"strconv"
 	"strings"
 	"time"
@@ -137,6 +138,7 @@ func (r *Resources) Close() error {
 	return nil
 }
 
+// todo 	r.db = gormDB  global.DB = gormDB  这里连接池的配置可以优化一下，后续有时间再改吧 ，这里不应该把grom db 即返回给resource 也返回给global 的db对象
 func (r *Resources) initMySQL() error {
 	if strings.TrimSpace(r.cfg.MySQLDSN) == "" {
 		return errors.New("mysql dsn is empty")
@@ -155,8 +157,11 @@ func (r *Resources) initMySQL() error {
 		return fmt.Errorf("ping mysql: %w", err)
 	}
 	r.db = gormDB
+	global.DB = gormDB
 	return nil
 }
+
+// todo	r.redis = clientglobal.Redis = client  这里连接池的配置可以优化一下，后续有时间再改吧 ，这里不应该把gredis db 即返回给resource 也返回给global 的redis对象
 
 func (r *Resources) initRedis() error {
 	client := redis.NewClient(&redis.Options{
@@ -170,6 +175,7 @@ func (r *Resources) initRedis() error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 	r.redis = client
+	global.Redis = client
 	return nil
 }
 

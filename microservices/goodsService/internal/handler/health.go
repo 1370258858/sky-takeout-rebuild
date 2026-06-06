@@ -1,8 +1,14 @@
 package handler
 
-import "net/http"
+import (
+	"sky-takeout/microservices/goodsService/common/retcode"
 
-func Health(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    _, _ = w.Write([]byte("ok"))
+	"github.com/gin-gonic/gin"
+)
+
+func Health(c *gin.Context) {
+	retcode.OK(c, gin.H{
+		"service": "goodsService",
+		"status":  "ok",
+	})
 }
