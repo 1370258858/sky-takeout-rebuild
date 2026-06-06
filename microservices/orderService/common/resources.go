@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sky-takeout/microservices/orderService/global"
 	"strconv"
 	"strings"
 	"time"
@@ -155,6 +156,7 @@ func (r *Resources) initMySQL() error {
 		return fmt.Errorf("ping mysql: %w", err)
 	}
 	r.db = gormDB
+	global.DB = gormDB
 	return nil
 }
 
@@ -170,6 +172,7 @@ func (r *Resources) initRedis() error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 	r.redis = client
+	global.Redis = client
 	return nil
 }
 

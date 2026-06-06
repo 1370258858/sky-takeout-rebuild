@@ -26,9 +26,18 @@ type Dish struct {
 	// 一对多
 	Flavors []DishFlavor `json:"flavors"`
 }
+
+func (Dish) TableName() string {
+	return "dish"
+}
+
 type DishFlavor struct {
 	Id     uint64 `json:"id"`      //口味id
 	DishId uint64 `json:"dish_id"` //菜品id
 	Name   string `json:"name"`    //口味主题 温度|甜度|辣度
 	Value  string `json:"value"`   //口味信息 可多个
+}
+
+func (DishFlavor) TableName() string {
+	return "dish_flavor"
 }

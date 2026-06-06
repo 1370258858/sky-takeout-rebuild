@@ -18,7 +18,7 @@ func NewDishController(service service.DishService) *DishController {
 }
 
 func (cr *DishController) InitApiRouter(parent *gin.RouterGroup) {
-	privateRouter := parent.Group("/category")
+	privateRouter := parent.Group("/dish")
 	privateRouter.GET("/list", cr.List)
 }
 

@@ -2,7 +2,7 @@ package e
 
 import (
 	"net/http"
-	"sky-takeout/microservices/gatewayService/common"
+	"sky-takeout/microservices/goodsService/common"
 
 	"github.com/gin-gonic/gin"
 )

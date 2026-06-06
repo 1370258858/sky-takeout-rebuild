@@ -7,19 +7,17 @@ import (
 )
 
 type DishService interface {
-	List(ctx context.Context, req *model.Resquest) error
+	List(ctx context.Context, req *model.Resquest) ([]model.Dish, error)
 }
 
 type DishServiceImpl struct {
 	repo *dao.DishDao
 }
 
-func (d *DishServiceImpl) List(ctx context.Context, req *model.Resquest) error {
+func (d *DishServiceImpl) List(ctx context.Context, req *model.Resquest) ([]model.Dish, error) {
 	// 这里的service层主要负责处理业务逻辑，调用repository层进行数据访问，最后返回结果给controller层
-	err := d.repo.List(ctx, model.Dish{
-		DishId: req.ID,
-	})
-	return err
+	dish, err := d.repo.List(ctx, *req)
+	return dish, err
 
 }
 

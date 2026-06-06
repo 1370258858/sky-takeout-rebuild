@@ -73,7 +73,7 @@ func LoadConfigFromEnv(prefix string) Config {
 
 	if cfg.MySQLDSN == "" {
 		// Local debug default: connect to docker-mapped mysql port on host.
-		cfg.MySQLDSN = "sky:sky@tcp(127.0.0.1:3306)/sky_takeout?charset=utf8mb4&parseTime=True&loc=Local"
+		cfg.MySQLDSN = "sky:sky@tcp(127.0.0.1:3306)/sky_take_out?charset=utf8mb4&parseTime=True&loc=Local"
 	}
 
 	if cfg.RedisAddr == "" {

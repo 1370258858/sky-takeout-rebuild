@@ -1,0 +1,354 @@
+openapi: 3.0.3
+info:
+  title: Sky Takeout Gateway Proxy API (Apifox)
+  version: 2.0.0
+  description: |
+    Gateway-first API spec for Apifox import.
+    Real calling style uses gateway proxy paths, for example:
+    /proxy/false/goods-service/goods/dish/list
+
+    Notes:
+    1) Most microservice examples below are callable through gateway (port 18080).
+    2) workspace-service is currently not mapped in gateway switch-case, so a direct example is provided.
+
+servers:
+  - url: http://localhost:18080
+    description: gateway-service (proxy entry)
+  - url: http://localhost:18088
+    description: workspace-service direct (no gateway mapping currently)
+
+tags:
+  - name: gateway-service
+  - name: admin-service-proxy
+  - name: user-service-proxy
+  - name: goods-service-proxy
+  - name: order-service-proxy
+  - name: delivery-service-proxy
+  - name: file-service-proxy
+  - name: report-service-proxy
+  - name: workspace-service-direct
+
+paths:
+  /healthz:
+    get:
+      tags: [gateway-service, workspace-service-direct]
+      summary: Health Check (Gateway or Workspace Direct)
+      description: |
+        Select server to call different services:
+        - http://localhost:18080 => gateway-service health
+        - http://localhost:18088 => workspace-service health (direct)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /getway/token/exchange:
+    post:
+      tags: [gateway-service]
+      summary: Exchange Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenExchangeRequest'
+            example:
+              username: admin
+              password: 123456
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /getway/token/refresh:
+    post:
+      tags: [gateway-service]
+      summary: Refresh Access Token
+      parameters:
+        - in: header
+          name: Authorization-AccessToken
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: Authorization-RefreshToken
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+            example:
+              username: admin
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/{isAuth}/{service}/{proxyPath}:
+    parameters:
+      - $ref: '#/components/parameters/IsAuthParam'
+      - $ref: '#/components/parameters/ServiceParam'
+      - $ref: '#/components/parameters/ProxyPathParam'
+    get:
+      tags: [gateway-service]
+      summary: Generic Gateway Proxy (GET)
+      description: Generic passthrough endpoint for GET requests.
+      responses:
+        '200':
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+    post:
+      tags: [gateway-service]
+      summary: Generic Gateway Proxy (POST)
+      description: Generic passthrough endpoint for POST requests.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+    put:
+      tags: [gateway-service]
+      summary: Generic Gateway Proxy (PUT)
+      description: Generic passthrough endpoint for PUT requests.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+    delete:
+      tags: [gateway-service]
+      summary: Generic Gateway Proxy (DELETE)
+      description: Generic passthrough endpoint for DELETE requests.
+      responses:
+        '200':
+          description: Proxied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/admin-service/admin/employee/login:
+    post:
+      tags: [admin-service-proxy]
+      summary: Employee Login (Proxy)
+      description: Callable admin-service example via gateway.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required: [username, password]
+            example:
+              username: admin
+              password: 123456
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/user-service/healthz:
+    get:
+      tags: [user-service-proxy]
+      summary: User Service Health (Proxy)
+      description: Callable user-service example via gateway.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /proxy/false/goods-service/goods/dish/list:
+    get:
+      tags: [goods-service-proxy]
+      summary: Dish List (Proxy, real path)
+      description: Real callable path from gateway to goods-service.
+      parameters:
+        - in: query
+          name: id
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/healthz:
+    get:
+      tags: [order-service-proxy]
+      summary: Order Service Health (Proxy)
+      description: Callable order-service example via gateway.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /proxy/false/delivery-service/healthz:
+    get:
+      tags: [delivery-service-proxy]
+      summary: Delivery Service Health (Proxy)
+      description: Callable delivery-service example via gateway.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /proxy/false/file-service/healthz:
+    get:
+      tags: [file-service-proxy]
+      summary: File Service Health (Proxy)
+      description: Callable file-service example via gateway.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /proxy/false/report-service/healthz:
+    get:
+      tags: [report-service-proxy]
+      summary: Report Service Health (Proxy)
+      description: Callable report-service example via gateway.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        service:
+          type: string
+          example: goods-service
+        status:
+          type: string
+          example: ok
+      required: [service, status]
+
+    TokenExchangeRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required: [username, password]
+
+    RefreshRequest:
+      type: object
+      properties:
+        username:
+          type: string
+      required: [username]
+
+    GenericResponse:
+      type: object
+      description: Generic response placeholder for current services.
+      additionalProperties: true
+      example:
+        code: 1
+        msg: success
+        data: {}
+
+  parameters:
+    IsAuthParam:
+      in: path
+      name: isAuth
+      required: true
+      schema:
+        type: boolean
+      description: Whether gateway enforces auth for current proxied request.
+
+    ServiceParam:
+      in: path
+      name: service
+      required: true
+      schema:
+        type: string
+        enum:
+          - admin-service
+          - user-service
+          - goods-service
+          - order-service
+          - delivery-service
+          - payment-service
+          - file-service
+          - report-service
+          - worker-service
+      description: Target microservice name.
+
+    ProxyPathParam:
+      in: path
+      name: proxyPath
+      required: true
+      schema:
+        type: string
+      description: Downstream service path after /service/.
