@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sky-takeout/microservices/goodsService/global"
 	"strconv"
@@ -105,11 +106,17 @@ func (r *Resources) PublishJSON(exchange, routingKey string, body []byte) error 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	return r.mqCh.PublishWithContext(ctx, exchange, routingKey, false, false, amqp.Publishing{
+	log.Printf("[MQ][goods] publish exchange=%s routingKey=%s body=%s", exchange, routingKey, string(body))
+	err := r.mqCh.PublishWithContext(ctx, exchange, routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if err != nil {
+		log.Printf("[MQ][goods] publish failed err=%v", err)
+		return err
+	}
+	log.Printf("[MQ][goods] publish success exchange=%s routingKey=%s", exchange, routingKey)
+	return nil
 }
 
 // Close gracefully closes mq and redis resources.
@@ -180,6 +187,7 @@ func (r *Resources) initRedis() error {
 }
 
 func (r *Resources) initMQ() error {
+	log.Printf("[MQ][goods] connect url=%s", r.cfg.MQURL)
 	conn, err := amqp.Dial(r.cfg.MQURL)
 	if err != nil {
 		return fmt.Errorf("dial mq: %w", err)
@@ -191,6 +199,7 @@ func (r *Resources) initMQ() error {
 	}
 	r.mqConn = conn
 	r.mqCh = ch
+	log.Printf("[MQ][goods] connect success")
 	return nil
 }
 

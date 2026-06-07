@@ -97,70 +97,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
 
-  /proxy/{isAuth}/{service}/{proxyPath}:
-    parameters:
-      - $ref: '#/components/parameters/IsAuthParam'
-      - $ref: '#/components/parameters/ServiceParam'
-      - $ref: '#/components/parameters/ProxyPathParam'
-    get:
-      tags: [gateway-service]
-      summary: Generic Gateway Proxy (GET)
-      description: Generic passthrough endpoint for GET requests.
-      responses:
-        '200':
-          description: Proxied response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericResponse'
-    post:
-      tags: [gateway-service]
-      summary: Generic Gateway Proxy (POST)
-      description: Generic passthrough endpoint for POST requests.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Proxied response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericResponse'
-    put:
-      tags: [gateway-service]
-      summary: Generic Gateway Proxy (PUT)
-      description: Generic passthrough endpoint for PUT requests.
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Proxied response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericResponse'
-    delete:
-      tags: [gateway-service]
-      summary: Generic Gateway Proxy (DELETE)
-      description: Generic passthrough endpoint for DELETE requests.
-      responses:
-        '200':
-          description: Proxied response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericResponse'
-
   /proxy/false/admin-service/admin/employee/login:
     post:
       tags: [admin-service-proxy]
@@ -235,6 +171,186 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
 
+  /proxy/false/order-service/order/list:
+    get:
+      tags: [order-service-proxy]
+      summary: Order List (Proxy)
+      description: Query orders by userId and optional status.
+      parameters:
+        - in: query
+          name: userId
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/create:
+    post:
+      tags: [order-service-proxy]
+      summary: Create Order (Proxy)
+      description: Create pending-pay order, invoke goods RPC, and publish delayed timeout message.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+            example:
+              goodId: 51
+              quantity: 1
+              userId: 1
+              addressBookId: 1
+              payMethod: 1
+              amount: 56.0
+              remark: 少辣
+              phone: "13800138000"
+              address: 成都市高新区天府大道100号
+              userName: 张三
+              consignee: 张三
+              estimatedDeliveryTime: 2026-06-07 12:30:00
+              packAmount: 2
+              tablewareNumber: 1
+              tablewareStatus: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/detail/{id}:
+    get:
+      tags: [order-service-proxy]
+      summary: Order Detail (Proxy)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/cancel/{id}:
+    post:
+      tags: [order-service-proxy]
+      summary: Cancel Order (Proxy)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCancelRequest'
+            example:
+              reason: 用户主动取消
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/pay/{id}:
+    post:
+      tags: [order-service-proxy]
+      summary: Pay Order (Proxy)
+      description: 
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderPayRequest'
+            example:
+              payStatus: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/pay_timeout/{id}:
+    post:
+      tags: [order-service-proxy]
+      summary: Pay Timeout Callback (Proxy)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/refund/{id}:
+    post:
+      tags: [order-service-proxy]
+      summary: Refund Order (Proxy)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRefundRequest'
+            example:
+              reason: 用户申请退款
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
   /proxy/false/delivery-service/healthz:
     get:
       tags: [delivery-service-proxy]
@@ -247,6 +363,107 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /proxy/false/delivery-service/delivery/list:
+    get:
+      tags: [delivery-service-proxy]
+      summary: Delivery List (Proxy)
+      parameters:
+        - in: query
+          name: orderId
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/delivery-service/delivery/detail/{orderId}:
+    get:
+      tags: [delivery-service-proxy]
+      summary: Delivery Detail By OrderId (Proxy)
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/delivery-service/delivery/create:
+    post:
+      tags: [delivery-service-proxy]
+      summary: Create Delivery (Proxy)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveryCreateRequest'
+            example:
+              orderId: 1000001
+              deliveryNo: DL1000001
+              status: 1
+              goodsInfo: '{"orderId":1000001,"amount":56.0}'
+              pickupAddress: 蜀味餐厅(高新店)
+              deliveryAddress: 成都市高新区天府大道100号
+              expectedArrivalTime: 2026-06-07 12:30:00
+              remark: 呼叫骑手中
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/delivery-service/delivery/status/{orderId}:
+    post:
+      tags: [delivery-service-proxy]
+      summary: Update Delivery Status (Proxy)
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveryStatusUpdateRequest'
+            example:
+              status: 3
+              remark: 骑手配送中
+              riderId: 1001
+              riderName: 张三骑手
+              riderPhone: "13800000001"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
 
   /proxy/false/file-service/healthz:
     get:
@@ -309,6 +526,118 @@ components:
           type: string
       required: [username]
 
+    OrderCreateRequest:
+      type: object
+      properties:
+        goodId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          format: int64
+        addressBookId:
+          type: integer
+          format: int64
+        payMethod:
+          type: integer
+          description: 1 微信, 2 支付宝
+        amount:
+          type: number
+          format: double
+        remark:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        userName:
+          type: string
+        consignee:
+          type: string
+        estimatedDeliveryTime:
+          type: string
+          description: yyyy-MM-dd HH:mm:ss
+        packAmount:
+          type: integer
+        tablewareNumber:
+          type: integer
+        tablewareStatus:
+          type: integer
+          description: 1 按餐量提供 0 指定数量
+      required: [goodId, userId, addressBookId, amount]
+
+    OrderPayRequest:
+      type: object
+      properties:
+        payStatus:
+          type: integer
+          enum: [1, 2, 3]
+          description: 1 成功, 2 失败, 3 超时
+      required: [payStatus]
+
+    OrderCancelRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    OrderRefundRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    DeliveryCreateRequest:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        deliveryNo:
+          type: string
+        status:
+          type: integer
+        goodsInfo:
+          type: string
+          description: JSON string snapshot
+        riderId:
+          type: integer
+          format: int64
+        riderName:
+          type: string
+        riderPhone:
+          type: string
+        pickupAddress:
+          type: string
+        deliveryAddress:
+          type: string
+        expectedArrivalTime:
+          type: string
+          description: yyyy-MM-dd HH:mm:ss
+        remark:
+          type: string
+      required: [orderId, goodsInfo]
+
+    DeliveryStatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: 1待派单 2待取餐 3配送中 4已送达 5异常 6取消
+        remark:
+          type: string
+        riderId:
+          type: integer
+          format: int64
+        riderName:
+          type: string
+        riderPhone:
+          type: string
+      required: [status]
+
     GenericResponse:
       type: object
       description: Generic response placeholder for current services.
@@ -324,7 +653,8 @@ components:
       name: isAuth
       required: true
       schema:
-        type: boolean
+        type: string
+        enum: ["true", "false"]
       description: Whether gateway enforces auth for current proxied request.
 
     ServiceParam:

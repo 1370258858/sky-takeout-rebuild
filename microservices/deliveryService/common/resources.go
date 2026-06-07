@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"sky-takeout/microservices/deliveryService/global"
 	"strconv"
 	"strings"
 	"time"
@@ -104,11 +106,17 @@ func (r *Resources) PublishJSON(exchange, routingKey string, body []byte) error 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	return r.mqCh.PublishWithContext(ctx, exchange, routingKey, false, false, amqp.Publishing{
+	log.Printf("[MQ][delivery] publish exchange=%s routingKey=%s body=%s", exchange, routingKey, string(body))
+	err := r.mqCh.PublishWithContext(ctx, exchange, routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
+	if err != nil {
+		log.Printf("[MQ][delivery] publish failed err=%v", err)
+		return err
+	}
+	log.Printf("[MQ][delivery] publish success exchange=%s routingKey=%s", exchange, routingKey)
+	return nil
 }
 
 // Close gracefully closes mq and redis resources.
@@ -155,6 +163,7 @@ func (r *Resources) initMySQL() error {
 		return fmt.Errorf("ping mysql: %w", err)
 	}
 	r.db = gormDB
+	global.DB = gormDB
 	return nil
 }
 
@@ -170,10 +179,12 @@ func (r *Resources) initRedis() error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 	r.redis = client
+	global.Redis = client
 	return nil
 }
 
 func (r *Resources) initMQ() error {
+	log.Printf("[MQ][delivery] connect url=%s", r.cfg.MQURL)
 	conn, err := amqp.Dial(r.cfg.MQURL)
 	if err != nil {
 		return fmt.Errorf("dial mq: %w", err)
@@ -185,6 +196,7 @@ func (r *Resources) initMQ() error {
 	}
 	r.mqConn = conn
 	r.mqCh = ch
+	log.Printf("[MQ][delivery] connect success")
 	return nil
 }
 

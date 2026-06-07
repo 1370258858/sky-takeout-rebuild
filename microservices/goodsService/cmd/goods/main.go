@@ -38,9 +38,8 @@ func main() {
 	r.GET("/healthz", handler.Health)
 
 	api := r.Group("/goods")
-	dishCtrl := controller.NewDishController(
-		service.NewDishService(dao.NewDishDao(global.DB)),
-	)
+	dishService := service.NewDishService(dao.NewDishDao(global.DB))
+	dishCtrl := controller.NewDishController(dishService)
 	dishCtrl.InitApiRouter(api)
 
 	addr := ":18083"
@@ -62,7 +61,7 @@ func main() {
 		log.Fatalf("goodsService listen grpc error: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	goodsrpcv1.RegisterGoodsServer(grpcServer, goodsrpcserver.NewGoodsRPCServer())
+	goodsrpcv1.RegisterGoodsServer(grpcServer, goodsrpcserver.NewGoodsRPCServer(dishService))
 
 	go func() {
 		log.Printf("goodsService grpc listening on %s", grpcAddr)

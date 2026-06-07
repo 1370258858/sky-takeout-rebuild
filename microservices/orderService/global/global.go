@@ -1,6 +1,7 @@
 package global
 
 import (
+	deliveryrpcv1 "sky-takeout/microservices/rpc/pb/deliveryv1"
 	goodrpcv1 "sky-takeout/microservices/rpc/pb/goodsv1"
 
 	logger "github.com/Meng-Xin/logger"
@@ -10,8 +11,9 @@ import (
 
 // Global resources for business layers.
 var (
-	Log            logger.ILog
-	DB             *gorm.DB
-	Redis          *redis.Client
-	GoodsRPCClient goodrpcv1.GoodsClient
+	Log               logger.ILog
+	DB                *gorm.DB
+	Redis             *redis.Client
+	GoodsRPCClient    goodrpcv1.GoodsClient
+	DeliveryRPCClient deliveryrpcv1.DeliveryClient
 )
