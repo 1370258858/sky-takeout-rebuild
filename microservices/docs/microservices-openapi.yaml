@@ -196,6 +196,110 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
 
+  /proxy/false/order-service/order/cart/create:
+    post:
+      tags: [order-service-proxy]
+      summary: Create Cart Item (Proxy)
+      description: Add one dish item to shopping cart.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCartCreateRequest'
+            example:
+              userId: 1
+              goodId: 51
+              quantity: 2
+              name: 老坛酸菜鱼
+              image: https://cdn.example.com/dish/51.jpg
+              flavor: 微辣
+              amount: 56.0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/cart/detail/{userId}:
+    get:
+      tags: [order-service-proxy]
+      summary: Cart Detail By UserId (Proxy)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/cart/update/{userId}:
+    post:
+      tags: [order-service-proxy]
+      summary: Update Cart Item (Proxy)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCartUpdateRequest'
+            example:
+              cartId: 1
+              quantity: 3
+              flavor: 中辣
+              amount: 56.0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
+  /proxy/false/order-service/order/cart/delete/{userId}:
+    post:
+      tags: [order-service-proxy]
+      summary: Delete Cart Item Or Clear User Cart (Proxy)
+      description: Delete one cart item by cartId; if cartId is empty, clear all cart items for current user.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCartDeleteRequest'
+            example:
+              cartId: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+
   /proxy/false/order-service/order/create:
     post:
       tags: [order-service-proxy]
@@ -568,6 +672,52 @@ components:
           type: integer
           description: 1 按餐量提供 0 指定数量
       required: [goodId, userId, addressBookId, amount]
+
+    OrderCartCreateRequest:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        goodId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        image:
+          type: string
+        flavor:
+          type: string
+        amount:
+          type: number
+          format: double
+      required: [userId, goodId, quantity]
+
+    OrderCartUpdateRequest:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+        flavor:
+          type: string
+        amount:
+          type: number
+          format: double
+      required: [cartId, quantity]
+
+    OrderCartDeleteRequest:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          format: int64
 
     OrderPayRequest:
       type: object

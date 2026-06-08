@@ -29,6 +29,26 @@ type UpdateStatusRequest struct {
 	RiderPhone string  `json:"riderPhone"`
 }
 
+type AddressHistoryItem struct {
+	Consignee string `json:"consignee"`
+	Phone     string `json:"phone"`
+	Address   string `json:"address"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type UpdateAddressRequest struct {
+	DeliveryAddress    string               `json:"deliveryAddress"`
+	Remark             string               `json:"remark"`
+	Consignee          string               `json:"consignee"`
+	Phone              string               `json:"phone"`
+	AddressHistory     []AddressHistoryItem `json:"addressHistory"`
+	AddressHistoryJSON string               `json:"-"`
+}
+
+type ReviewRequest struct {
+	Review string `json:"review" binding:"required"`
+}
+
 type Delivery struct {
 	ID                  uint64     `json:"id" gorm:"column:id"`
 	OrderID             uint64     `json:"orderId" gorm:"column:order_id"`
@@ -45,6 +65,8 @@ type Delivery struct {
 	ExpectedArrivalTime *time.Time `json:"expectedArrivalTime" gorm:"column:expected_arrival_time"`
 	DeliveredTime       *time.Time `json:"deliveredTime" gorm:"column:delivered_time"`
 	Remark              string     `json:"remark" gorm:"column:remark"`
+	Review              string     `json:"review" gorm:"column:review"`
+	AddressHistoryJSON  string     `json:"addressHistory" gorm:"column:address_history_json"`
 	CreateTime          *time.Time `json:"createTime" gorm:"column:create_time"`
 	UpdateTime          *time.Time `json:"updateTime" gorm:"column:update_time"`
 }

@@ -134,3 +134,51 @@ func (d *DeliveryDao) UpdateByOrderIDInsert(ctx context.Context, orderID uint64,
 	log.Printf("[DB][delivery] insert history rows=%d orderId=%d status=%d", tx.RowsAffected, orderID, req.Status)
 	return entity, nil
 }
+
+func (d *DeliveryDao) UpdateAddressByOrderID(ctx context.Context, orderID uint64, req model.UpdateAddressRequest) (*model.Delivery, error) {
+	current, err := d.GetByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	updates := map[string]interface{}{
+		"update_time": time.Now(),
+	}
+	if req.DeliveryAddress != "" {
+		updates["delivery_address"] = req.DeliveryAddress
+	}
+	if req.Remark != "" {
+		updates["remark"] = req.Remark
+	}
+	if req.AddressHistoryJSON != "" {
+		updates["address_history_json"] = req.AddressHistoryJSON
+	}
+
+	query := d.db.WithContext(ctx).Model(&model.Delivery{}).Where("id = ?", current.ID)
+	if err = query.Updates(updates).Error; err != nil {
+		return nil, retcode.NewError(e.MysqlERR, "update delivery address failed")
+	}
+	if query.RowsAffected == 0 {
+		return nil, retcode.NewError(e.ErrorOrderNotFound, "delivery not found")
+	}
+	log.Printf("[DB][delivery] update address rows=%d orderId=%d updates=%v", query.RowsAffected, orderID, updates)
+	return d.GetByOrderID(ctx, orderID)
+}
+
+func (d *DeliveryDao) ReviewByOrderID(ctx context.Context, orderID uint64, review string) (*model.Delivery, error) {
+	current, err := d.GetByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	query := d.db.WithContext(ctx).Model(&model.Delivery{}).Where("id = ?", current.ID).Updates(map[string]interface{}{
+		"review":      review,
+		"update_time": time.Now(),
+	})
+	if query.Error != nil {
+		return nil, retcode.NewError(e.MysqlERR, "update delivery review failed")
+	}
+	if query.RowsAffected == 0 {
+		return nil, retcode.NewError(e.ErrorOrderNotFound, "delivery not found")
+	}
+	log.Printf("[DB][delivery] update review rows=%d orderId=%d", query.RowsAffected, orderID)
+	return d.GetByOrderID(ctx, orderID)
+}
