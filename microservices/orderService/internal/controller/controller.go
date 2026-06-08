@@ -21,6 +21,14 @@ func NewOrderController(service service.OrderService) *OrderController {
 func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {
 	privateRouter := parent.Group("")
 	privateRouter.GET("/list", oc.List)
+	//创建购物车
+	privateRouter.POST("/cart/create", oc.createCart)
+	//查看购物车
+	privateRouter.GET("/cart/detail/:userId", oc.CartDetail)
+	//修改购物车
+	privateRouter.POST("/cart/update/:userId", oc.UpdateCart)
+	//删除购物车
+	privateRouter.POST("/cart/delete/:userId", oc.DeleteCart)
 	//创建订单  rd 生成id 订单创建一般是幂等的，所以可以通过客户端生成一个唯一id，服务端根据这个id进行幂等处理，如果订单已经存在就返回订单信息，如果订单不存在就创建订单并返回订单信息
 	//创建订单 id 目前在服务端雪花id生产 后续再加rd逻辑
 	privateRouter.POST("/create", oc.Create)
@@ -36,6 +44,68 @@ func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {
 	//订单退款  支付前调用退款接口，直接取消订单；支付后调用退款接口，调用第三方支付退款接口，退款成功后取消订单
 	privateRouter.POST("/refund/:id", oc.Refund)
 
+}
+
+func (oc *OrderController) createCart(ctx *gin.Context) {
+	var req model.CreateCartRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	cart, err := oc.service.CreateCart(ctx.Request.Context(), &req)
+	if err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	retcode.OK(ctx, cart)
+}
+
+func (oc *OrderController) CartDetail(ctx *gin.Context) {
+	userID, err := strconv.ParseUint(ctx.Param("userId"), 10, 64)
+	if err != nil {
+		retcode.Fatal(ctx, err, "invalid user id")
+		return
+	}
+	carts, err := oc.service.GetCart(ctx.Request.Context(), userID)
+	if err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	retcode.OK(ctx, carts)
+}
+
+func (oc *OrderController) UpdateCart(ctx *gin.Context) {
+	userID, err := strconv.ParseUint(ctx.Param("userId"), 10, 64)
+	if err != nil {
+		retcode.Fatal(ctx, err, "invalid user id")
+		return
+	}
+	var req model.UpdateCartRequest
+	if err = ctx.ShouldBindJSON(&req); err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	cart, err := oc.service.UpdateCart(ctx.Request.Context(), userID, &req)
+	if err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	retcode.OK(ctx, cart)
+}
+
+func (oc *OrderController) DeleteCart(ctx *gin.Context) {
+	userID, err := strconv.ParseUint(ctx.Param("userId"), 10, 64)
+	if err != nil {
+		retcode.Fatal(ctx, err, "invalid user id")
+		return
+	}
+	var req model.DeleteCartRequest
+	_ = ctx.ShouldBindJSON(&req)
+	if err = oc.service.DeleteCart(ctx.Request.Context(), userID, &req); err != nil {
+		retcode.Fatal(ctx, err, "")
+		return
+	}
+	retcode.OK(ctx, gin.H{"userId": userID, "deleted": true, "cartId": req.CartID})
 }
 
 func (oc *OrderController) Create(ctx *gin.Context) {

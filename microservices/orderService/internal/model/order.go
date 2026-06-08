@@ -69,6 +69,44 @@ type Order struct {
 	TablewareStatus     int        `json:"tablewareStatus" gorm:"column:tableware_status"`
 }
 
+type CreateCartRequest struct {
+	UserID   uint64  `json:"userId" binding:"required"`
+	GoodID   int64   `json:"goodId" binding:"required"`
+	Quantity int     `json:"quantity" binding:"required"`
+	Name     string  `json:"name"`
+	Image    string  `json:"image"`
+	Flavor   string  `json:"flavor"`
+	Amount   float64 `json:"amount"`
+}
+
+type UpdateCartRequest struct {
+	CartID   uint64  `json:"cartId" binding:"required"`
+	Quantity int     `json:"quantity" binding:"required"`
+	Flavor   string  `json:"flavor"`
+	Amount   float64 `json:"amount"`
+}
+
+type DeleteCartRequest struct {
+	CartID uint64 `json:"cartId"`
+}
+
+type OrderCart struct {
+	ID         uint64     `json:"id" gorm:"column:id"`
+	Name       string     `json:"name" gorm:"column:name"`
+	Image      string     `json:"image" gorm:"column:image"`
+	UserID     uint64     `json:"userId" gorm:"column:user_id"`
+	GoodID     int64      `json:"goodId" gorm:"column:dish_id"`
+	SetMealID  *uint64    `json:"setmealId,omitempty" gorm:"column:setmeal_id"`
+	Flavor     string     `json:"flavor" gorm:"column:dish_flavor"`
+	Quantity   int        `json:"quantity" gorm:"column:number"`
+	Amount     float64    `json:"amount" gorm:"column:amount"`
+	CreateTime *time.Time `json:"createTime,omitempty" gorm:"column:create_time"`
+}
+
+func (OrderCart) TableName() string {
+	return "shopping_cart"
+}
+
 func (Order) TableName() string {
 	return "orders"
 }

@@ -68,3 +68,68 @@ func (d *OrderDao) UpdateByID(ctx context.Context, id uint64, updates map[string
 	log.Printf("[DB][order] update rows=%d orderId=%d updates=%v", query.RowsAffected, id, updates)
 	return nil
 }
+
+func (d *OrderDao) CreateOrderCart(ctx context.Context, in *model.OrderCart) (*model.OrderCart, error) {
+	tx := d.db.WithContext(ctx).Create(in)
+	if tx.Error != nil {
+		return nil, retcode.NewError(e.MysqlERR, "create order cart failed")
+	}
+	log.Printf("[DB][order] insert rows=%d orderCartId=%d", tx.RowsAffected, in.ID)
+	return in, nil
+
+}
+
+func (d *OrderDao) GetCartByUserID(ctx context.Context, userID uint64) ([]model.OrderCart, error) {
+	var carts []model.OrderCart
+	tx := d.db.WithContext(ctx).Model(&model.OrderCart{}).Where("user_id = ?", userID).Order("id desc").Find(&carts)
+	if tx.Error != nil {
+		return nil, retcode.NewError(e.MysqlERR, "query order cart failed")
+	}
+	log.Printf("[DB][order] query cart by userId rows=%d userId=%d", tx.RowsAffected, userID)
+	return carts, nil
+}
+
+func (d *OrderDao) GetCartItemByID(ctx context.Context, userID uint64, cartID uint64) (*model.OrderCart, error) {
+	var cart model.OrderCart
+	tx := d.db.WithContext(ctx).Model(&model.OrderCart{}).Where("user_id = ? AND id = ?", userID, cartID).Take(&cart)
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			return nil, retcode.NewError(e.ErrorOrderCartNotFound, "order cart not found")
+		}
+		return nil, retcode.NewError(e.MysqlERR, "query order cart failed")
+	}
+	return &cart, nil
+}
+
+func (d *OrderDao) UpdateCartByUserID(ctx context.Context, userID uint64, cartID uint64, updates map[string]any) error {
+	query := d.db.WithContext(ctx).Model(&model.OrderCart{}).Where("user_id = ? AND id = ?", userID, cartID)
+	if err := query.Updates(updates).Error; err != nil {
+		return retcode.NewError(e.MysqlERR, "update order cart failed")
+	}
+	if query.RowsAffected == 0 {
+		return retcode.NewError(e.ErrorOrderCartNotFound, "order cart not found")
+	}
+	log.Printf("[DB][order] update cart rows=%d userId=%d cartId=%d updates=%v", query.RowsAffected, userID, cartID, updates)
+	return nil
+}
+
+func (d *OrderDao) DeleteCartItemByID(ctx context.Context, userID uint64, cartID uint64) error {
+	tx := d.db.WithContext(ctx).Where("user_id = ? AND id = ?", userID, cartID).Delete(&model.OrderCart{})
+	if tx.Error != nil {
+		return retcode.NewError(e.MysqlERR, "delete order cart item failed")
+	}
+	if tx.RowsAffected == 0 {
+		return retcode.NewError(e.ErrorOrderCartNotFound, "order cart not found")
+	}
+	log.Printf("[DB][order] delete cart item rows=%d userId=%d cartId=%d", tx.RowsAffected, userID, cartID)
+	return nil
+}
+
+func (d *OrderDao) DeleteCartByUserID(ctx context.Context, userID uint64) error {
+	tx := d.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&model.OrderCart{})
+	if tx.Error != nil {
+		return retcode.NewError(e.MysqlERR, "delete order cart failed")
+	}
+	log.Printf("[DB][order] delete cart rows=%d userId=%d", tx.RowsAffected, userID)
+	return nil
+}

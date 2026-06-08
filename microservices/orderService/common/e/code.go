@@ -33,6 +33,7 @@ const (
 	ErrorDishBeRelatedByOrder       = 2017 //当前菜品关联了订单,不能删除
 	ErrorOrderStatusError           = 2018 //订单状态错误
 	ErrorOrderNotFound              = 2019 //订单不存在
+	ErrorOrderCartNotFound          = 2020 //订单购物车不存在
 
 )
 
