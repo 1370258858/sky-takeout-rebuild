@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -25,9 +26,77 @@ import (
 	orderrpcv1 "sky-takeout/microservices/rpc/pb/orderv1"
 
 	"github.com/gin-gonic/gin"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 )
+
+type CreateOrderInput struct {
+	UserID        uint64  `json:"userId" jsonschema:"user id"`
+	GoodID        uint64  `json:"goodId" jsonschema:"goods id"`
+	AddressBookID uint64  `json:"addressBookId" jsonschema:"address book id"`
+	Amount        float64 `json:"amount" jsonschema:"order amount"`
+	Quantity      int     `json:"quantity,omitempty" jsonschema:"goods quantity"`
+}
+
+type CreateOrderOutput struct {
+	OrderID      uint64  `json:"orderId" jsonschema:"created order id"`
+	OrderNo      string  `json:"orderNo" jsonschema:"created order number"`
+	Status       int     `json:"status" jsonschema:"order status"`
+	UserID       uint64  `json:"userId" jsonschema:"user id"`
+	GoodID       uint64  `json:"goodId" jsonschema:"goods id"`
+	Amount       float64 `json:"amount" jsonschema:"order amount"`
+	Quantity     int     `json:"quantity" jsonschema:"goods quantity"`
+	CreatedAt    string  `json:"createdAt" jsonschema:"order create time"`
+	Message      string  `json:"message" jsonschema:"result message"`
+	IsMockResult bool    `json:"isMockResult" jsonschema:"whether this result is mocked"`
+}
+
+func newCreateOrderToolHandler(orderCtrl *controller.OrderController) func(context.Context, *mcp.CallToolRequest, CreateOrderInput) (*mcp.CallToolResult, *CreateOrderOutput, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest, input CreateOrderInput) (*mcp.CallToolResult, *CreateOrderOutput, error) {
+		_ = req
+		if input.UserID == 0 || input.GoodID == 0 || input.AddressBookID == 0 || input.Amount <= 0 {
+			return nil, &CreateOrderOutput{}, fmt.Errorf("invalid request: userId/goodId/addressBookId/amount are required")
+		}
+
+		qty := input.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+
+		createOrderRequest := model.CreateOrderRequest{
+			GoodID:        int64(input.GoodID),
+			Quantity:      qty,
+			UserID:        input.UserID,
+			AddressBookID: input.AddressBookID,
+			Amount:        input.Amount,
+		}
+		orderData, err := orderCtrl.CreateForMCP(ctx, &createOrderRequest)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		createdAt := ""
+		if orderData.OrderTime != nil {
+			createdAt = orderData.OrderTime.Format(time.RFC3339)
+		}
+
+		result := CreateOrderOutput{
+			OrderID:      orderData.ID,
+			OrderNo:      orderData.Number,
+			Status:       orderData.Status,
+			UserID:       orderData.UserID,
+			GoodID:       input.GoodID,
+			Amount:       orderData.Amount,
+			Quantity:     qty,
+			CreatedAt:    createdAt,
+			Message:      "create_order executed by MCP server",
+			IsMockResult: false,
+		}
+
+		return nil, &result, nil
+	}
+}
 
 func main() {
 	resources := common.MustInitForService()
@@ -121,6 +190,23 @@ func main() {
 	)
 	orderCtrl.InitApiRouter(api)
 
+	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "order-tools", Version: "v1.0.0"}, nil)
+	mcp.AddTool(mcpServer, &mcp.Tool{Name: "create_order", Description: "Create a takeout order with userId, goodId, addressBookId and amount."}, newCreateOrderToolHandler(orderCtrl))
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
+		return mcpServer
+	}, nil)
+	mcpAddr := strings.TrimSpace(os.Getenv("ORDER_MCP_ADDR"))
+	if mcpAddr == "" {
+		mcpAddr = ":8001"
+	}
+	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
+	go func() {
+		log.Printf("orderService MCP streamable-http listening on %s (path: /mcp)", mcpAddr)
+		if err := mcpHTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("orderService MCP serve error: %v", err)
+		}
+	}()
+
 	addr := ":18084"
 	server := &http.Server{Addr: addr, Handler: r}
 	go func() {
@@ -183,6 +269,9 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("orderService shutdown error: %v", err)
+	}
+	if err := mcpHTTPServer.Shutdown(ctx); err != nil {
+		log.Printf("orderService MCP shutdown error: %v", err)
 	}
 	_ = consumeCh.Close()
 	grpcServer.GracefulStop()

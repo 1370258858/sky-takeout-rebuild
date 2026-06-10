@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 
 	"sky-takeout/microservices/orderService/common/retcode"
@@ -16,6 +18,14 @@ type OrderController struct {
 
 func NewOrderController(service service.OrderService) *OrderController {
 	return &OrderController{service: service}
+}
+
+// CreateForMCP exposes create order ability for MCP adapters.
+func (oc *OrderController) CreateForMCP(ctx context.Context, req *model.CreateOrderRequest) (*model.Order, error) {
+	if req == nil {
+		return nil, fmt.Errorf("invalid request")
+	}
+	return oc.service.Create(ctx, req)
 }
 
 func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {
@@ -214,3 +224,5 @@ func (oc *OrderController) List(ctx *gin.Context) {
 	}
 	retcode.OK(ctx, orders)
 }
+
+//mcp func write here
