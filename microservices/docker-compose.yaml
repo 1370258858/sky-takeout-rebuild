@@ -140,6 +140,26 @@ services:
     ports:
       - "18084:18084"
 
+  order-mcp-service:
+    build:
+      context: .
+      dockerfile: ./orderService/Dockerfile.mcp
+    container_name: sky-order-mcp-service
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+    environment:
+      ORDER_SERVICE_MYSQL_DSN: ${ORDER_SERVICE_MYSQL_DSN}
+      ORDER_SERVICE_REDIS_ADDR: ${ORDER_SERVICE_REDIS_ADDR}
+      ORDER_SERVICE_REDIS_PASSWORD: ${ORDER_SERVICE_REDIS_PASSWORD}
+      ORDER_SERVICE_REDIS_DB: ${ORDER_SERVICE_REDIS_DB}
+      ORDER_SERVICE_MQ_URL: ${ORDER_SERVICE_MQ_URL}
+      ORDER_MCP_ADDR: :8001
+    ports:
+      - "8001:8001"
+
   delivery-service:
     build:
       context: .

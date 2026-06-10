@@ -4,6 +4,94 @@ package delivery.v1;
 
 option go_package = "microservices/rpc/proto/delivery/v1;deliveryv1";
 
-service DeliveryService {
+import "google/protobuf/timestamp.proto";
 
+service Delivery {
+	// GetDeliveryByOrderIdResponse 包含全表信息
+	rpc GetDeliveryByOrderId(GetDeliveryByOrderIdRequest) returns (GetDeliveryByOrderIdResponse);
+	rpc ListDeliveries(ListDeliveriesRequest) returns (ListDeliveriesResponse);
+	rpc CreateDelivery(CreateDeliveryRequest) returns (CreateDeliveryResponse);
+	rpc UpdateDeliveryStatus(UpdateDeliveryStatusRequest) returns (UpdateDeliveryStatusResponse);
+	rpc UpdateDeliveryByOrderId(UpdateDeliveryByOrderIdRequest) returns (UpdateDeliveryByOrderIdResponse);
+}
+
+message DeliveryDetail {
+	uint64 id = 1;
+	uint64 order_id = 2;
+	string delivery_no = 3;
+	int32 status = 4;
+	string goods_info = 5;
+	uint64 rider_id = 6;
+	string rider_name = 7;
+	string rider_phone = 8;
+	string pickup_address = 9;
+	string delivery_address = 10;
+	google.protobuf.Timestamp dispatch_time = 11;
+	google.protobuf.Timestamp pickup_time = 12;
+	google.protobuf.Timestamp expected_arrival_time = 13;
+	google.protobuf.Timestamp delivered_time = 14;
+	string remark = 15;
+	google.protobuf.Timestamp create_time = 16;
+	google.protobuf.Timestamp update_time = 17;
+}
+
+message GetDeliveryByOrderIdRequest {
+	uint64 order_id = 1;
+}
+
+message GetDeliveryByOrderIdResponse {
+	DeliveryDetail delivery = 1;
+}
+
+message ListDeliveriesRequest {
+	uint64 order_id = 1;
+	optional int32 status = 2;
+}
+
+message ListDeliveriesResponse {
+	repeated DeliveryDetail items = 1;
+}
+
+message CreateDeliveryRequest {
+	uint64 order_id = 1;
+	string delivery_no = 2;
+	int32 status = 3;
+	string goods_info = 4;
+	uint64 rider_id = 5;
+	string rider_name = 6;
+	string rider_phone = 7;
+	string pickup_address = 8;
+	string delivery_address = 9;
+	string expected_arrival_time = 10;
+	string remark = 11;
+}
+
+message CreateDeliveryResponse {
+	DeliveryDetail delivery = 1;
+}
+
+message UpdateDeliveryStatusRequest {
+	uint64 order_id = 1;
+	int32 status = 2;
+	string remark = 3;
+	uint64 rider_id = 4;
+	string rider_name = 5;
+	string rider_phone = 6;
+}
+
+message UpdateDeliveryStatusResponse {
+	DeliveryDetail delivery = 1;
+}
+
+message UpdateDeliveryByOrderIdRequest {
+	uint64 order_id = 1;
+	int32 status = 2;
+	string remark = 3;
+	uint64 rider_id = 4;
+	string rider_name = 5;
+	string rider_phone = 6;
+}
+
+message UpdateDeliveryByOrderIdResponse {
+	DeliveryDetail delivery = 1;
 }
