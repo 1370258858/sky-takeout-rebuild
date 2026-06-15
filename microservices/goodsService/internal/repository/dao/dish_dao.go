@@ -14,7 +14,7 @@ type DishDao struct {
 	db *gorm.DB
 }
 
-func (d *DishDao) List(ctx context.Context, req model.Resquest) ([]model.Dish, error) {
+func (d *DishDao) List(ctx context.Context) ([]model.Dish, error) {
 	var dishes []model.Dish
 	tx := d.db.WithContext(ctx).Model(&dishes).Find(&dishes)
 	if tx.Error != nil {

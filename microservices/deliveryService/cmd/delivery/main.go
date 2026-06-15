@@ -22,6 +22,7 @@ import (
 	deliveryrpcv1 "sky-takeout/microservices/rpc/pb/deliveryv1"
 
 	"github.com/gin-gonic/gin"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"google.golang.org/grpc"
 )
 
@@ -75,6 +76,27 @@ func main() {
 		}
 	}()
 
+	// MCP FUNCTION
+	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "delivery-tools", Version: "v1.0.0"}, nil)
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
+		return mcpServer
+	}, nil)
+	mcpAddr := strings.TrimSpace(os.Getenv("DELIVERY_MCP_ADDR"))
+	if mcpAddr == "" {
+		mcpAddr = ":8001"
+	}
+	mcpPath := strings.TrimSpace(os.Getenv("DELIVERY_MCP_PATH"))
+	if mcpPath == "" {
+		mcpPath = "/mcp"
+	}
+	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
+	go func() {
+		log.Printf("deliveryService MCP streamable-http listening on %s (path: %s)", mcpAddr, mcpPath)
+		if err := mcpHTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("deliveryService MCP serve error: %v", err)
+		}
+	}()
+
 	goodsRPCAddr := os.Getenv("GOODS_SERVICE_GRPC_ADDR")
 	if strings.TrimSpace(goodsRPCAddr) == "" {
 		goodsRPCAddr = "goods-service:19083"
@@ -95,5 +117,8 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("deliveryService shutdown error: %v", err)
+	}
+	if err := mcpHTTPServer.Shutdown(ctx); err != nil {
+		log.Printf("deliveryService MCP shutdown error: %v", err)
 	}
 }

@@ -16,14 +16,18 @@ import (
 	"sky-takeout/microservices/goodsService/global"
 	"sky-takeout/microservices/goodsService/internal/controller"
 	"sky-takeout/microservices/goodsService/internal/handler"
+	"sky-takeout/microservices/goodsService/internal/model"
 	"sky-takeout/microservices/goodsService/internal/repository/dao"
 	goodsrpcserver "sky-takeout/microservices/goodsService/internal/rpc/server"
 	"sky-takeout/microservices/goodsService/internal/service"
 	goodsrpcv1 "sky-takeout/microservices/rpc/pb/goodsv1"
 
 	"github.com/gin-gonic/gin"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"google.golang.org/grpc"
 )
+
+var goodsCtrl *controller.DishController
 
 func main() {
 	resources := common.MustInitForService()
@@ -39,8 +43,8 @@ func main() {
 
 	api := r.Group("/goods")
 	dishService := service.NewDishService(dao.NewDishDao(global.DB))
-	dishCtrl := controller.NewDishController(dishService)
-	dishCtrl.InitApiRouter(api)
+	goodsCtrl = controller.NewDishController(dishService)
+	goodsCtrl.InitApiRouter(api)
 
 	addr := ":18083"
 	server := &http.Server{Addr: addr, Handler: r}
@@ -48,6 +52,48 @@ func main() {
 		log.Printf("goodsService listening on %s (gin mode)", addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("goodsService serve error: %v", err)
+		}
+	}()
+
+	//MCP FUNCTION
+
+	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "goods-tools", Version: "v1.0.0"}, nil)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name:        "list_goods",
+		Description: "List all available goods.",
+		InputSchema: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+		},
+		OutputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"dishes": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "object",
+					},
+				},
+			},
+		},
+	}, newListGoodsToolHandler)
+	mcpAddr := strings.TrimSpace(os.Getenv("GOODS_MCP_ADDR"))
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
+		return mcpServer
+	}, nil)
+
+	if mcpAddr == "" {
+		mcpAddr = ":8001"
+	}
+	path := strings.TrimSpace(os.Getenv("GOODS_MCP_PATH"))
+	if path == "" {
+		path = "/mcp"
+	}
+	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
+	go func() {
+		log.Printf("goodsService MCP streamable-http listening on %s (path: %s)", mcpAddr, path)
+		if err := mcpHTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("goodsService MCP serve error: %v", err)
 		}
 	}()
 
@@ -80,4 +126,15 @@ func main() {
 		log.Printf("goodsService shutdown error: %v", err)
 	}
 	grpcServer.GracefulStop()
+}
+
+func newListGoodsToolHandler(ctx context.Context, req *mcp.CallToolRequest, input model.Resquest) (*mcp.CallToolResult, []model.Dish, error) {
+	var result []model.Dish
+	dish, err := goodsCtrl.ListMCP(&ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	result = append(result, dish...)
+
+	return nil, result, nil
 }

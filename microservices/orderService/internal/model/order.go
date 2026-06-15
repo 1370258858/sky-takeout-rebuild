@@ -43,21 +43,21 @@ type OrderTimeoutMessage struct {
 }
 
 type Order struct {
-	ID                  uint64     `json:"id"`
-	Number              string     `json:"number"`
-	Status              int        `json:"status"`
+	ID                  uint64     `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
+	Number              string     `json:"number" gorm:"column:number"`
+	Status              int        `json:"status" gorm:"column:status"`
 	UserID              uint64     `json:"userId" gorm:"column:user_id"`
 	AddressBookID       uint64     `json:"addressBookId" gorm:"column:address_book_id"`
 	OrderTime           *time.Time `json:"orderTime" gorm:"column:order_time"`
 	CheckoutTime        *time.Time `json:"checkoutTime,omitempty" gorm:"column:checkout_time"`
 	PayMethod           int        `json:"payMethod" gorm:"column:pay_method"`
 	PayStatus           int        `json:"payStatus" gorm:"column:pay_status"`
-	Amount              float64    `json:"amount"`
-	Remark              string     `json:"remark"`
-	Phone               string     `json:"phone"`
-	Address             string     `json:"address"`
+	Amount              float64    `json:"amount" gorm:"column:amount"`
+	Remark              string     `json:"remark" gorm:"column:remark"`
+	Phone               string     `json:"phone" gorm:"column:phone"`
+	Address             string     `json:"address" gorm:"column:address"`
 	UserName            string     `json:"userName" gorm:"column:user_name"`
-	Consignee           string     `json:"consignee"`
+	Consignee           string     `json:"consignee" gorm:"column:consignee"`
 	CancelReason        string     `json:"cancelReason" gorm:"column:cancel_reason"`
 	RejectionReason     string     `json:"rejectionReason" gorm:"column:rejection_reason"`
 	CancelTime          *time.Time `json:"cancelTime,omitempty" gorm:"column:cancel_time"`

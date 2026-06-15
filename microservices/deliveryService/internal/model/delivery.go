@@ -50,7 +50,7 @@ type ReviewRequest struct {
 }
 
 type Delivery struct {
-	ID                  uint64     `json:"id" gorm:"column:id"`
+	ID                  uint64     `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 	OrderID             uint64     `json:"orderId" gorm:"column:order_id"`
 	DeliveryNo          string     `json:"deliveryNo" gorm:"column:delivery_no"`
 	Status              int        `json:"status" gorm:"column:status"`

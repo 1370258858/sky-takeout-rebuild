@@ -21,5 +21,5 @@ RUN adduser -D -H -u 10001 appuser
 COPY --from=builder /out/app /app/app
 USER appuser
 
-EXPOSE 18085
+EXPOSE 18085 8005
 ENTRYPOINT ["/app/app"]
