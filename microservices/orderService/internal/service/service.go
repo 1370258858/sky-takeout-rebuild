@@ -68,33 +68,68 @@ func (s *OrderServiceImpl) List(ctx context.Context, req *model.Request) ([]mode
 }
 
 func (s *OrderServiceImpl) Create(ctx context.Context, req *model.CreateOrderRequest) (*model.Order, error) {
+	if req == nil {
+		return nil, retcode.NewError(e.ERROR, "request is required")
+	}
+	var order *model.Order
+	if req.CartID != 0 {
+		// If cartId is provided, we should use it to fetch the cart
+		log.Printf("[SVC][order] create from cart request userId=%d cartId=%d", req.UserID, req.CartID)
+		cartItem, err := s.repo.GetCartItemByID(ctx, req.UserID, req.CartID)
+		if err != nil {
+			log.Printf("[SVC][order][ERR] create from cart failed get cart item userId=%d cartId=%d err=%v", req.UserID, req.CartID, err)
+			return nil, retcode.NewError(e.ERROR, "get cart item failed")
+		}
+		if cartItem == nil {
+			log.Printf("[SVC][order][ERR] create from cart failed cart item not found userId=%d cartId=%d", req.UserID, req.CartID)
+			return nil, retcode.NewError(e.ERROR, "cart item not found")
+		}
+		// fill the order with the cart information
+		if len(cartItem.GoodIDs) > 0 {
+			req.GoodIDs = cartItem.GoodIDs
+		}
+		if req.Quantity <= 0 {
+			req.Quantity = cartItem.Quantity
+		}
+		if req.Amount <= 0 {
+			req.Amount = cartItem.Amount
+		}
+		log.Printf("[SVC][order] create from cart success userId=%d cartId=%d goodIds=%v quantity=%d amount=%.2f", req.UserID, req.CartID, req.GoodIDs, req.Quantity, req.Amount)
+	}
+	if req == nil || len(req.GoodIDs) == 0 {
+		return nil, retcode.NewError(e.ERROR, "goodIds is required")
+	}
 	if global.GoodsRPCClient == nil {
-		log.Printf("[SVC][order][ERR] create failed goods rpc client not initialized userId=%d goodId=%d", req.UserID, req.GoodID)
+		log.Printf("[SVC][order][ERR] create failed goods rpc client not initialized userId=%d goodIds=%v", req.UserID, req.GoodIDs)
 		return nil, retcode.NewError(e.ERROR, "goods rpc client not initialized")
 	}
 	if req.Quantity <= 0 {
 		req.Quantity = 1
 	}
-	log.Printf("[SVC][order] create request userId=%d goodId=%d quantity=%d amount=%.2f", req.UserID, req.GoodID, req.Quantity, req.Amount)
+	log.Printf("[SVC][order] create request userId=%d goodIds=%v quantity=%d amount=%.2f", req.UserID, req.GoodIDs, req.Quantity, req.Amount)
 
-	log.Printf("[RPC][order->goods] method=GetGoodById req={id:%d}", req.GoodID)
-	good, err := global.GoodsRPCClient.GetGoodById(ctx, &goodsv1.GetGoodByIdRequest{Id: req.GoodID})
-	if err != nil {
-		log.Printf("[SVC][order][ERR] create failed goods rpc error goodId=%d err=%v", req.GoodID, err)
-		return nil, retcode.NewError(e.ERROR, "query goods rpc failed")
-	}
-	log.Printf("[RPC][order->goods] method=GetGoodById resp={id:%d,name:%s,status:%d}", good.GetId(), good.GetName(), good.GetStatus())
-	if good.GetId() == 0 {
-		log.Printf("[SVC][order][ERR] create failed goods not found goodId=%d", req.GoodID)
-		return nil, retcode.NewError(e.ErrorOrderNotFound, "goods not found")
+	for _, goodID := range req.GoodIDs {
+		log.Printf("[RPC][order->goods] method=GetGoodById req={id:%d}", goodID)
+		good, err := global.GoodsRPCClient.GetGoodById(ctx, &goodsv1.GetGoodByIdRequest{Id: goodID})
+		if err != nil {
+			log.Printf("[SVC][order][ERR] create failed goods rpc error goodId=%d err=%v", goodID, err)
+			return nil, retcode.NewError(e.ERROR, "query goods rpc failed")
+		}
+		log.Printf("[RPC][order->goods] method=GetGoodById resp={id:%d,name:%s,status:%d}", good.GetId(), good.GetName(), good.GetStatus())
+		if good.GetId() == 0 {
+			log.Printf("[SVC][order][ERR] create failed goods not found goodId=%d", goodID)
+			return nil, retcode.NewError(e.ErrorOrderNotFound, "goods not found")
+		}
 	}
 
 	orderID := NextOrderID()
 	now := time.Now()
-	order := &model.Order{
-		ID:              orderID,
-		Number:          strconv.FormatUint(orderID, 10),
-		Status:          orderStatusPendingPay,
+	order = &model.Order{
+		ID:      orderID,
+		Number:  strconv.FormatUint(orderID, 10),
+		GoodIDs: req.GoodIDs,
+		Status:  orderStatusPendingPay,
+
 		UserID:          req.UserID,
 		AddressBookID:   req.AddressBookID,
 		OrderTime:       &now,
@@ -314,25 +349,28 @@ func (s *OrderServiceImpl) CreateCart(ctx context.Context, req *model.CreateCart
 		log.Printf("[SVC][order][ERR] create cart failed nil request")
 		return nil, retcode.NewError(e.ERROR, "invalid create cart request")
 	}
+	if len(req.GoodIDs) == 0 {
+		return nil, retcode.NewError(e.ERROR, "goodIds is required")
+	}
 	if req.Quantity <= 0 {
 		req.Quantity = 1
 	}
-	log.Printf("[SVC][order] create cart request userId=%d goodId=%d quantity=%d", req.UserID, req.GoodID, req.Quantity)
+	log.Printf("[SVC][order] create cart request userId=%d goodIds=%v quantity=%d", req.UserID, req.GoodIDs, req.Quantity)
 
 	createdCart, err := s.repo.CreateOrderCart(ctx, &model.OrderCart{
 		Name:     req.Name,
 		Image:    req.Image,
 		UserID:   req.UserID,
-		GoodID:   req.GoodID,
+		GoodIDs:  req.GoodIDs,
 		Flavor:   req.Flavor,
 		Quantity: req.Quantity,
 		Amount:   req.Amount,
 	})
 	if err != nil {
-		log.Printf("[SVC][order][ERR] create cart failed persist userId=%d goodId=%d err=%v", req.UserID, req.GoodID, err)
+		log.Printf("[SVC][order][ERR] create cart failed persist userId=%d goodIds=%v err=%v", req.UserID, req.GoodIDs, err)
 		return nil, err
 	}
-	log.Printf("[SVC][order] create cart success orderCartId=%d userId=%d goodId=%d", createdCart.ID, req.UserID, req.GoodID)
+	log.Printf("[SVC][order] create cart success orderCartId=%d userId=%d goodIds=%v", createdCart.ID, req.UserID, req.GoodIDs)
 	return createdCart, nil
 }
 

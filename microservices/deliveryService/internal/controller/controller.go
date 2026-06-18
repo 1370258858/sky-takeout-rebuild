@@ -11,11 +11,11 @@ import (
 )
 
 type DeliveryController struct {
-	service service.DeliveryService
+	Service service.DeliveryService
 }
 
 func NewDeliveryController(service service.DeliveryService) *DeliveryController {
-	return &DeliveryController{service: service}
+	return &DeliveryController{Service: service}
 }
 
 func (dc *DeliveryController) InitApiRouter(parent *gin.RouterGroup) {
@@ -37,7 +37,7 @@ func (dc *DeliveryController) List(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	deliveries, err := dc.service.List(ctx.Request.Context(), &req)
+	deliveries, err := dc.Service.List(ctx.Request.Context(), &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -51,7 +51,7 @@ func (dc *DeliveryController) DetailByOrderID(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "invalid order id")
 		return
 	}
-	delivery, err := dc.service.GetByOrderID(ctx.Request.Context(), orderID)
+	delivery, err := dc.Service.GetByOrderID(ctx.Request.Context(), orderID)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -65,7 +65,7 @@ func (dc *DeliveryController) Create(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	delivery, err := dc.service.Create(ctx.Request.Context(), &req)
+	delivery, err := dc.Service.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -84,7 +84,7 @@ func (dc *DeliveryController) UpdateStatusByOrderID(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	delivery, err := dc.service.UpdateStatusByOrderID(ctx.Request.Context(), orderID, &req)
+	delivery, err := dc.Service.UpdateStatusByOrderID(ctx.Request.Context(), orderID, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -103,7 +103,7 @@ func (dc *DeliveryController) UpdateAddressByOrderID(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	delivery, err := dc.service.UpdateAddressByOrderID(ctx.Request.Context(), orderID, &req)
+	delivery, err := dc.Service.UpdateAddressByOrderID(ctx.Request.Context(), orderID, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -122,7 +122,7 @@ func (dc *DeliveryController) Review(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	delivery, err := dc.service.Review(ctx.Request.Context(), orderID, &req)
+	delivery, err := dc.Service.Review(ctx.Request.Context(), orderID, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return

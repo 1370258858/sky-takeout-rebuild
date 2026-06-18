@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 FROM golang:1.26-alpine AS builder
 WORKDIR /src
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
@@ -19,6 +17,7 @@ FROM alpine:3.20
 WORKDIR /app
 RUN adduser -D -H -u 10001 appuser
 COPY --from=builder /out/app /app/app
+COPY --from=builder /src/orderService/cmd/order/mcp-config.yaml /app/
 USER appuser
 
 EXPOSE 18084 8004

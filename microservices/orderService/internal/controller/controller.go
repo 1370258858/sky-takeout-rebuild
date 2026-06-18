@@ -13,26 +13,41 @@ import (
 )
 
 type OrderController struct {
-	service service.OrderService
+	Service service.OrderService
 }
 
 func NewOrderController(service service.OrderService) *OrderController {
-	return &OrderController{service: service}
+	return &OrderController{Service: service}
 }
 
 // CreateForMCP exposes create order ability for MCP adapters.
+// 
+// Two ways to create an order:
+// 
+// Mode 1: Create from goods list
+//   - Required fields: userId, goodIds, amount, addressBookId
+//   - Set cartId to 0 or omit it
+//   - quantity defaults to 1 if not provided
+// 
+// Mode 2: Create from shopping cart
+//   - Required fields: userId, cartId (non-zero), addressBookId
+//   - Do NOT provide goodIds or amount (they will be fetched from cart)
+//   - quantity can optionally override cart's quantity, or omit to use cart's quantity
+// 
+// Optional fields (both modes): remark, phone, address, userName, consignee, payMethod, 
+//   estimatedDeliveryTime (format: "2006-01-02 15:04:05"), packAmount, tablewareNumber, tablewareStatus
 func (oc *OrderController) CreateForMCP(ctx context.Context, req *model.CreateOrderRequest) (*model.Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("invalid request")
 	}
-	return oc.service.Create(ctx, req)
+	return oc.Service.Create(ctx, req)
 }
 
 func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {
 	privateRouter := parent.Group("")
 	privateRouter.GET("/list", oc.List)
 	//创建购物车
-	privateRouter.POST("/cart/create", oc.createCart)
+	privateRouter.POST("/cart/create", oc.CreateCart)
 	//查看购物车
 	privateRouter.GET("/cart/detail/:userId", oc.CartDetail)
 	//修改购物车
@@ -56,13 +71,13 @@ func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {
 
 }
 
-func (oc *OrderController) createCart(ctx *gin.Context) {
+func (oc *OrderController) CreateCart(ctx *gin.Context) {
 	var req model.CreateCartRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	cart, err := oc.service.CreateCart(ctx.Request.Context(), &req)
+	cart, err := oc.Service.CreateCart(ctx.Request.Context(), &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -76,7 +91,7 @@ func (oc *OrderController) CartDetail(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "invalid user id")
 		return
 	}
-	carts, err := oc.service.GetCart(ctx.Request.Context(), userID)
+	carts, err := oc.Service.GetCart(ctx.Request.Context(), userID)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -95,7 +110,7 @@ func (oc *OrderController) UpdateCart(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	cart, err := oc.service.UpdateCart(ctx.Request.Context(), userID, &req)
+	cart, err := oc.Service.UpdateCart(ctx.Request.Context(), userID, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -111,7 +126,7 @@ func (oc *OrderController) DeleteCart(ctx *gin.Context) {
 	}
 	var req model.DeleteCartRequest
 	_ = ctx.ShouldBindJSON(&req)
-	if err = oc.service.DeleteCart(ctx.Request.Context(), userID, &req); err != nil {
+	if err = oc.Service.DeleteCart(ctx.Request.Context(), userID, &req); err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
@@ -124,7 +139,7 @@ func (oc *OrderController) Create(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	order, err := oc.service.Create(ctx.Request.Context(), &req)
+	order, err := oc.Service.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -138,7 +153,7 @@ func (oc *OrderController) Detail(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "invalid order id")
 		return
 	}
-	order, err := oc.service.Detail(ctx.Request.Context(), id)
+	order, err := oc.Service.Detail(ctx.Request.Context(), id)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -154,7 +169,7 @@ func (oc *OrderController) Cancel(ctx *gin.Context) {
 	}
 	var req model.CancelOrderRequest
 	_ = ctx.ShouldBindJSON(&req)
-	order, err := oc.service.Cancel(ctx.Request.Context(), id, &req)
+	order, err := oc.Service.Cancel(ctx.Request.Context(), id, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -173,7 +188,7 @@ func (oc *OrderController) Pay(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	order, err := oc.service.Pay(ctx.Request.Context(), id, &req)
+	order, err := oc.Service.Pay(ctx.Request.Context(), id, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -187,7 +202,7 @@ func (oc *OrderController) PayTimeout(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "invalid order id")
 		return
 	}
-	order, err := oc.service.PayTimeout(ctx.Request.Context(), id)
+	order, err := oc.Service.PayTimeout(ctx.Request.Context(), id)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -203,7 +218,7 @@ func (oc *OrderController) Refund(ctx *gin.Context) {
 	}
 	var req model.RefundOrderRequest
 	_ = ctx.ShouldBindJSON(&req)
-	order, err := oc.service.Refund(ctx.Request.Context(), id, &req)
+	order, err := oc.Service.Refund(ctx.Request.Context(), id, &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
@@ -217,7 +232,7 @@ func (oc *OrderController) List(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	orders, err := oc.service.List(ctx.Request.Context(), &req)
+	orders, err := oc.Service.List(ctx.Request.Context(), &req)
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return

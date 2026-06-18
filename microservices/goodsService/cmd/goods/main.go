@@ -16,7 +16,6 @@ import (
 	"sky-takeout/microservices/goodsService/global"
 	"sky-takeout/microservices/goodsService/internal/controller"
 	"sky-takeout/microservices/goodsService/internal/handler"
-	"sky-takeout/microservices/goodsService/internal/model"
 	"sky-takeout/microservices/goodsService/internal/repository/dao"
 	goodsrpcserver "sky-takeout/microservices/goodsService/internal/rpc/server"
 	"sky-takeout/microservices/goodsService/internal/service"
@@ -56,39 +55,49 @@ func main() {
 	}()
 
 	//MCP FUNCTION
-
-	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "goods-tools", Version: "v1.0.0"}, nil)
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name:        "list_goods",
-		Description: "List all available goods.",
-		InputSchema: map[string]interface{}{
-			"type":       "object",
-			"properties": map[string]interface{}{},
-		},
-		OutputSchema: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"dishes": map[string]interface{}{
-					"type": "array",
-					"items": map[string]interface{}{
-						"type": "object",
-					},
-				},
+	// Load MCP configuration from file
+	mcpConfig, err := LoadMCPConfig("")
+	if err != nil {
+		log.Printf("warning: failed to load MCP config, using defaults: %v", err)
+		mcpConfig = &MCPConfig{
+			Server: MCPServerConfig{
+				Name:    "goods-tools",
+				Version: "v1.0.0",
+				Address: ":8003",
+				Path:    "/mcp",
 			},
-		},
-	}, newListGoodsToolHandler)
-	mcpAddr := strings.TrimSpace(os.Getenv("GOODS_MCP_ADDR"))
+		}
+	}
+	if err := mcpConfig.ValidateConfig(); err != nil {
+		log.Fatalf("invalid MCP config: %v", err)
+	}
+	mcpConfig.PrintConfig()
+
+	// Create MCP server with config
+	mcpServer := mcp.NewServer(&mcp.Implementation{
+		Name:    mcpConfig.Server.Name,
+		Version: mcpConfig.Server.Version,
+	}, nil)
+
+	// Register all tools from configuration
+	for _, toolCfg := range mcpConfig.Tools {
+		switch toolCfg.Handler {
+		case "ListGoods":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewListGoodsToolHandler)
+		case "GetGoodDetail":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewGetGoodDetailToolHandler)
+		default:
+			log.Printf("warning: unknown tool handler %s", toolCfg.Handler)
+		}
+	}
+
+	PrintAllTools(mcpConfig)
+
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return mcpServer
 	}, nil)
-
-	if mcpAddr == "" {
-		mcpAddr = ":8001"
-	}
-	path := strings.TrimSpace(os.Getenv("GOODS_MCP_PATH"))
-	if path == "" {
-		path = "/mcp"
-	}
+	mcpAddr := mcpConfig.Server.Address
+	path := mcpConfig.Server.Path
 	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
 	go func() {
 		log.Printf("goodsService MCP streamable-http listening on %s (path: %s)", mcpAddr, path)
@@ -126,15 +135,4 @@ func main() {
 		log.Printf("goodsService shutdown error: %v", err)
 	}
 	grpcServer.GracefulStop()
-}
-
-func newListGoodsToolHandler(ctx context.Context, req *mcp.CallToolRequest, input model.Resquest) (*mcp.CallToolResult, []model.Dish, error) {
-	var result []model.Dish
-	dish, err := goodsCtrl.ListMCP(&ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	result = append(result, dish...)
-
-	return nil, result, nil
 }

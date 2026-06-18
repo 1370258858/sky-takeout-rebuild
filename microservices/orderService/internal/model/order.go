@@ -8,14 +8,17 @@ type Request struct {
 	Status *int   `form:"status" json:"status"`
 }
 
+// CreateOrderRequest defines the request for creating an order.
+// Refer to CreateForMCP() in controller for detailed usage documentation.
 type CreateOrderRequest struct {
-	GoodID                int64   `json:"goodId" binding:"required"`
+	GoodIDs               []int64 `json:"goodIds"`
 	Quantity              int     `json:"quantity"`
 	UserID                uint64  `json:"userId" binding:"required"`
 	AddressBookID         uint64  `json:"addressBookId" binding:"required"`
 	PayMethod             int     `json:"payMethod"`
-	Amount                float64 `json:"amount" binding:"required"`
+	Amount                float64 `json:"amount"`
 	Remark                string  `json:"remark"`
+	CartID                uint64  `json:"cartId" `
 	Phone                 string  `json:"phone"`
 	Address               string  `json:"address"`
 	UserName              string  `json:"userName"`
@@ -35,7 +38,8 @@ type CancelOrderRequest struct {
 }
 
 type RefundOrderRequest struct {
-	Reason string `json:"reason"`
+	Reason  string `json:"reason"`
+	OrderID uint64 `json:"orderId"`
 }
 
 type OrderTimeoutMessage struct {
@@ -45,6 +49,7 @@ type OrderTimeoutMessage struct {
 type Order struct {
 	ID                  uint64     `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 	Number              string     `json:"number" gorm:"column:number"`
+	GoodIDs             []int64    `json:"goodIds" gorm:"column:good_ids;type:json;serializer:json"`
 	Status              int        `json:"status" gorm:"column:status"`
 	UserID              uint64     `json:"userId" gorm:"column:user_id"`
 	AddressBookID       uint64     `json:"addressBookId" gorm:"column:address_book_id"`
@@ -71,7 +76,7 @@ type Order struct {
 
 type CreateCartRequest struct {
 	UserID   uint64  `json:"userId" binding:"required"`
-	GoodID   int64   `json:"goodId" binding:"required"`
+	GoodIDs  []int64 `json:"goodIds" binding:"required"`
 	Quantity int     `json:"quantity" binding:"required"`
 	Name     string  `json:"name"`
 	Image    string  `json:"image"`
@@ -80,6 +85,7 @@ type CreateCartRequest struct {
 }
 
 type UpdateCartRequest struct {
+	UserID   uint64  `json:"userId" binding:"required"`
 	CartID   uint64  `json:"cartId" binding:"required"`
 	Quantity int     `json:"quantity" binding:"required"`
 	Flavor   string  `json:"flavor"`
@@ -87,20 +93,38 @@ type UpdateCartRequest struct {
 }
 
 type DeleteCartRequest struct {
+	UserID uint64 `json:"userId"`
 	CartID uint64 `json:"cartId"`
 }
 
 type OrderCart struct {
-	ID         uint64     `json:"id" gorm:"column:id"`
+	ID         uint64     `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 	Name       string     `json:"name" gorm:"column:name"`
 	Image      string     `json:"image" gorm:"column:image"`
 	UserID     uint64     `json:"userId" gorm:"column:user_id"`
-	GoodID     int64      `json:"goodId" gorm:"column:dish_id"`
+	GoodIDs    []int64    `json:"goodIds" gorm:"column:good_ids;type:json;serializer:json"`
 	SetMealID  *uint64    `json:"setmealId,omitempty" gorm:"column:setmeal_id"`
 	Flavor     string     `json:"flavor" gorm:"column:dish_flavor"`
 	Quantity   int        `json:"quantity" gorm:"column:number"`
 	Amount     float64    `json:"amount" gorm:"column:amount"`
 	CreateTime *time.Time `json:"createTime,omitempty" gorm:"column:create_time"`
+	UpdateTime *time.Time `json:"updateTime,omitempty" gorm:"column:update_time"`
+}
+
+type OrderDetail struct {
+	ID         uint64  `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
+	Name       string  `json:"name" gorm:"column:name"`
+	Image      string  `json:"image" gorm:"column:image"`
+	OrderID    uint64  `json:"orderId" gorm:"column:order_id"`
+	DishID     *uint64 `json:"dishId,omitempty" gorm:"column:dish_id"`
+	SetMealID  *uint64 `json:"setmealId,omitempty" gorm:"column:setmeal_id"`
+	DishFlavor string  `json:"dishFlavor" gorm:"column:dish_flavor"`
+	Number     int     `json:"number" gorm:"column:number"`
+	Amount     float64 `json:"amount" gorm:"column:amount"`
+}
+
+type CartDetailRequest struct {
+	UserID uint64 `json:"userId" binding:"required"`
 }
 
 func (OrderCart) TableName() string {
@@ -109,4 +133,8 @@ func (OrderCart) TableName() string {
 
 func (Order) TableName() string {
 	return "orders"
+}
+
+func (OrderDetail) TableName() string {
+	return "order_detail"
 }

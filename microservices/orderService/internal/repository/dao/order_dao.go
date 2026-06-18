@@ -101,6 +101,7 @@ func (d *OrderDao) GetCartItemByID(ctx context.Context, userID uint64, cartID ui
 	return &cart, nil
 }
 
+// UpdateCartByUserID updates the cart by user ID and cart ID.
 func (d *OrderDao) UpdateCartByUserID(ctx context.Context, userID uint64, cartID uint64, updates map[string]any) error {
 	query := d.db.WithContext(ctx).Model(&model.OrderCart{}).Where("user_id = ? AND id = ?", userID, cartID)
 	if err := query.Updates(updates).Error; err != nil {

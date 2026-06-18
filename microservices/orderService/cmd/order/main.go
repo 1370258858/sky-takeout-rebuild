@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -124,22 +123,66 @@ func main() {
 		orderSvc,
 	)
 	orderCtrl.InitApiRouter(api)
-	//MCP FUNCTION
 
-	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "order-tools", Version: "v1.0.0"}, nil)
-	mcp.AddTool(mcpServer, &mcp.Tool{Name: "create_order", Description: "Create a takeout order with userId, goodId, addressBookId and amount."}, newCreateOrderToolHandler)
+	// Load MCP configuration from file
+	mcpConfig, err := LoadMCPConfig("")
+	if err != nil {
+		log.Printf("warning: failed to load MCP config, using defaults: %v", err)
+		mcpConfig = &MCPConfig{
+			Server: MCPServerConfig{
+				Name:    "order-tools",
+				Version: "v1.0.0",
+				Address: ":8001",
+				Path:    "/mcp",
+			},
+		}
+	}
+	if err := mcpConfig.ValidateConfig(); err != nil {
+		log.Fatalf("invalid MCP config: %v", err)
+	}
+	mcpConfig.PrintConfig()
+
+	// Create MCP server with config
+	mcpServer := mcp.NewServer(&mcp.Implementation{
+		Name:    mcpConfig.Server.Name,
+		Version: mcpConfig.Server.Version,
+	}, nil)
+
+	// Register all tools from configuration
+	for _, toolCfg := range mcpConfig.Tools {
+		switch toolCfg.Handler {
+		case "CreateOrder":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCreateOrderToolHandler)
+		case "CreateCart":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCreateCartToolHandler)
+		case "CartDetail":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCartDetailToolHandler)
+		case "UpdateCart":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewUpdateCartToolHandler)
+		case "DeleteCart":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewDeleteCartToolHandler)
+		case "RefundOrder":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewRefundOrderToolHandler)
+		case "GetOrderDetail":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewDetailToolHandler)
+		case "CancelOrder":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCancelOrderToolHandler)
+		case "PayOrder":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewPayOrderToolHandler)
+		case "ListOrders":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewListOrdersToolHandler)
+		default:
+			log.Printf("warning: unknown tool handler %s", toolCfg.Handler)
+		}
+	}
+
+	PrintAllTools(mcpConfig)
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return mcpServer
 	}, nil)
-	mcpAddr := strings.TrimSpace(os.Getenv("ORDER_MCP_ADDR"))
-	if mcpAddr == "" {
-		mcpAddr = ":8001"
-	}
-	path := strings.TrimSpace(os.Getenv("ORDER_MCP_PATH"))
-	if path == "" {
-		path = "/mcp"
-	}
+	mcpAddr := mcpConfig.Server.Address
+	path := mcpConfig.Server.Path
 	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
 	go func() {
 		log.Printf("orderService MCP streamable-http listening on %s (path: %s)", mcpAddr, path)
@@ -217,48 +260,4 @@ func main() {
 	_ = consumeCh.Close()
 	grpcServer.GracefulStop()
 
-}
-
-func newCreateOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input model.CreateOrderInput) (*mcp.CallToolResult, *model.CreateOrderOutput, error) {
-	_ = req
-	if input.UserID == 0 || input.GoodID == 0 || input.AddressBookID == 0 || input.Amount <= 0 {
-		return nil, &model.CreateOrderOutput{}, fmt.Errorf("invalid request: userId/goodId/addressBookId/amount are required")
-	}
-
-	qty := input.Quantity
-	if qty <= 0 {
-		qty = 1
-	}
-
-	createOrderRequest := model.CreateOrderRequest{
-		GoodID:        int64(input.GoodID),
-		Quantity:      qty,
-		UserID:        input.UserID,
-		AddressBookID: input.AddressBookID,
-		Amount:        input.Amount,
-	}
-	orderData, err := orderCtrl.CreateForMCP(ctx, &createOrderRequest)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	createdAt := ""
-	if orderData.OrderTime != nil {
-		createdAt = orderData.OrderTime.Format(time.RFC3339)
-	}
-
-	result := model.CreateOrderOutput{
-		OrderID:      orderData.ID,
-		OrderNo:      orderData.Number,
-		Status:       orderData.Status,
-		UserID:       orderData.UserID,
-		GoodID:       input.GoodID,
-		Amount:       orderData.Amount,
-		Quantity:     qty,
-		CreatedAt:    createdAt,
-		Message:      "create_order executed by MCP server",
-		IsMockResult: false,
-	}
-
-	return nil, &result, nil
 }

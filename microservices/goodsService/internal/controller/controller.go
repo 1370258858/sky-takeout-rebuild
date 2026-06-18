@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"sky-takeout/microservices/goodsService/common/retcode"
 	"sky-takeout/microservices/goodsService/global"
 	"sky-takeout/microservices/goodsService/internal/model"
@@ -11,11 +10,11 @@ import (
 )
 
 type DishController struct {
-	service service.DishService
+	Service service.DishService
 }
 
 func NewDishController(service service.DishService) *DishController {
-	return &DishController{service: service}
+	return &DishController{Service: service}
 }
 
 func (cr *DishController) InitApiRouter(parent *gin.RouterGroup) {
@@ -32,16 +31,10 @@ func (cc *DishController) List(ctx *gin.Context) {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
-	dish, err := cc.service.List(ctx.Request.Context())
+	dish, err := cc.Service.List(ctx.Request.Context())
 	if err != nil {
 		retcode.Fatal(ctx, err, "")
 		return
 	}
 	retcode.OK(ctx, dish)
-}
-
-// 这里的controller层主要负责接收请求，参数校验，调用service层处理业务逻辑，最后返回结果给客户端
-func (cc *DishController) ListMCP(ctx *context.Context) ([]model.Dish, error) {
-
-	return cc.service.List(*ctx)
 }

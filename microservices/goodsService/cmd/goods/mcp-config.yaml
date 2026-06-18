@@ -1,0 +1,14 @@
+server:
+  name: goods-tools
+  version: v1.0.0
+  address: ":8003"
+  path: "/mcp"
+
+tools:
+  - name: list_goods
+    description: "List all available goods/dishes. Returns object with dishes array and count."
+    handler: ListGoods
+
+  - name: get_good_detail
+    description: "Get goods/dish details by ID. Required: id (dish ID)."
+    handler: GetGoodDetail

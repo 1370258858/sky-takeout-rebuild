@@ -1,0 +1,413 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sky Takeout OrderService - Cart APIs",
+    "version": "1.0.0",
+    "description": "OrderService 购物车模块接口文档，可直接导入 Apifox。"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:18084",
+      "description": "本地开发环境"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Cart",
+      "description": "购物车模块"
+    }
+  ],
+  "paths": {
+    "/order/cart/create": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "新增购物车",
+        "operationId": "createCart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCartRequest"
+              },
+              "example": {
+                "userId": 10001,
+                "goodIds": [
+                  20001,
+                  20002
+                ],
+                "quantity": 2,
+                "name": "鱼香肉丝",
+                "image": "https://img.example.com/1.png",
+                "flavor": "微辣",
+                "amount": 26.5
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "业务响应（成功或失败都返回 HTTP 200，通过 code 区分）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order/cart/detail/{userId}": {
+      "get": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "查看购物车",
+        "operationId": "getCartDetail",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "用户 ID",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 10001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "业务响应（成功或失败都返回 HTTP 200，通过 code 区分）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order/cart/update/{userId}": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "修改购物车",
+        "operationId": "updateCart",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "用户 ID",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 10001
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCartRequest"
+              },
+              "example": {
+                "cartId": 1,
+                "userId": 10001,
+                "quantity": 3,
+                "flavor": "中辣",
+                "amount": 39.75
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "业务响应（成功或失败都返回 HTTP 200，通过 code 区分）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order/cart/delete/{userId}": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "删除购物车（支持删除单项或清空）",
+        "operationId": "deleteCart",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "用户 ID",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 10001
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCartRequest"
+              },
+              "example": {
+                "userId": 10001,
+                "cartId": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "业务响应（成功或失败都返回 HTTP 200，通过 code 区分）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteCartResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BaseResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "业务状态码，成功通常为 200"
+          },
+          "msg": {
+            "type": "string",
+            "description": "业务提示信息"
+          }
+        },
+        "required": [
+          "code",
+          "msg"
+        ]
+      },
+      "OrderCart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "goodIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "setmealId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "flavor": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CreateCartRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "goodIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "flavor": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "required": [
+          "userId",
+          "goodIds",
+          "quantity"
+        ]
+      },
+      "UpdateCartRequest": {
+        "type": "object",
+        "properties": {
+          "cartId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "flavor": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "required": [
+          "cartId",
+          "userId",
+          "quantity"
+        ]
+      },
+      "DeleteCartRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cartId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "传 cartId 删除单项；不传或 0 则清空当前用户购物车"
+          }
+        }
+      },
+      "DeleteCartResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "cartId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CartItemResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/OrderCart"
+              }
+            }
+          }
+        ]
+      },
+      "CartListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OrderCart"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DeleteCartResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/DeleteCartResult"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

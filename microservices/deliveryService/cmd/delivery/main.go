@@ -26,6 +26,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var DeliveryCtrl *controller.DeliveryController
+
 func main() {
 	resources := common.MustInitForService()
 	defer func() {
@@ -44,9 +46,9 @@ func main() {
 
 	repo := dao.NewDeliveryDao(global.DB)
 	deliverySvc := service.NewDeliveryService(repo)
-	deliveryCtrl := controller.NewDeliveryController(deliverySvc)
+	DeliveryCtrl = controller.NewDeliveryController(deliverySvc)
 	api := r.Group("/delivery")
-	deliveryCtrl.InitApiRouter(api)
+	DeliveryCtrl.InitApiRouter(api)
 
 	addr := ":18085"
 	server := &http.Server{Addr: addr, Handler: r}
@@ -77,21 +79,58 @@ func main() {
 	}()
 
 	// MCP FUNCTION
-	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "delivery-tools", Version: "v1.0.0"}, nil)
+	// Load MCP configuration from file
+	mcpConfig, err := LoadMCPConfig("")
+	if err != nil {
+		log.Printf("warning: failed to load MCP config, using defaults: %v", err)
+		mcpConfig = &MCPConfig{
+			Server: MCPServerConfig{
+				Name:    "delivery-tools",
+				Version: "v1.0.0",
+				Address: ":8002",
+				Path:    "/mcp",
+			},
+		}
+	}
+	if err := mcpConfig.ValidateConfig(); err != nil {
+		log.Fatalf("invalid MCP config: %v", err)
+	}
+	mcpConfig.PrintConfig()
+
+	// Create MCP server with config
+	mcpServer := mcp.NewServer(&mcp.Implementation{
+		Name:    mcpConfig.Server.Name,
+		Version: mcpConfig.Server.Version,
+	}, nil)
+
+	// Register all tools from configuration
+	for _, toolCfg := range mcpConfig.Tools {
+		switch toolCfg.Handler {
+		case "ListDeliveries":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewListDeliveriesToolHandler)
+		case "GetDeliveryDetail":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewGetDeliveryDetailToolHandler)
+		case "CreateDelivery":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCreateDeliveryToolHandler)
+		case "UpdateDeliveryStatus":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewUpdateDeliveryStatusToolHandler)
+		case "UpdateDeliveryAddress":
+			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewUpdateDeliveryAddressToolHandler)
+		default:
+			log.Printf("warning: unknown tool handler %s", toolCfg.Handler)
+		}
+	}
+
+	PrintAllTools(mcpConfig)
+
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return mcpServer
 	}, nil)
-	mcpAddr := strings.TrimSpace(os.Getenv("DELIVERY_MCP_ADDR"))
-	if mcpAddr == "" {
-		mcpAddr = ":8001"
-	}
-	mcpPath := strings.TrimSpace(os.Getenv("DELIVERY_MCP_PATH"))
-	if mcpPath == "" {
-		mcpPath = "/mcp"
-	}
+	mcpAddr := mcpConfig.Server.Address
+	path := mcpConfig.Server.Path
 	mcpHTTPServer := &http.Server{Addr: mcpAddr, Handler: mcpHandler}
 	go func() {
-		log.Printf("deliveryService MCP streamable-http listening on %s (path: %s)", mcpAddr, mcpPath)
+		log.Printf("deliveryService MCP streamable-http listening on %s (path: %s)", mcpAddr, path)
 		if err := mcpHTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("deliveryService MCP serve error: %v", err)
 		}

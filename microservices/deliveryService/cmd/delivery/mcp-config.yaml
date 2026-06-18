@@ -1,0 +1,34 @@
+server:
+  name: delivery-tools
+  version: v1.0.0
+  address: ":8002"
+  path: "/mcp"
+
+tools:
+  - name: list_deliveries
+    description: "List deliveries by order or status. Optional: orderId, status filter. Returns object with deliveries array."
+    handler: ListDeliveries
+
+  - name: get_delivery_detail
+    description: "Get delivery details by order ID. Required: orderId."
+    handler: GetDeliveryDetail
+
+  - name: create_delivery
+    description: "Create a new delivery record. Required: orderId, driverId, startLocation, endLocation. Optional: status, estimatedTime."
+    handler: CreateDelivery
+
+  - name: update_delivery_status
+    description: "Update delivery status. Required: orderId, status (0=pending, 1=in-transit, 2=delivered, 3=failed)."
+    handler: UpdateDeliveryStatus
+
+  - name: update_delivery_address
+    description: "Update delivery address. Required: orderId, address, location."
+    handler: UpdateDeliveryAddress
+
+  - name: add_delivery_review
+    description: "Add review for completed delivery. Required: orderId, rating (1-5), comment."
+    handler: AddDeliveryReview
+
+  - name: get_delivery_by_order
+    description: "Get delivery by order ID (alias for get_delivery_detail)."
+    handler: GetDeliveryByOrder

@@ -28,7 +28,7 @@ func (d *DeliveryDao) List(ctx context.Context, req model.Request) ([]model.Deli
 	if req.Status != nil {
 		query = query.Where("status = ?", *req.Status)
 	}
-	tx := query.Order("id desc").Find(&deliveries)
+	tx := query.Order("create_time desc").Find(&deliveries).Where(req)
 	if tx.Error != nil {
 		return nil, retcode.NewError(e.MysqlERR, "list delivery failed")
 	}
@@ -38,7 +38,7 @@ func (d *DeliveryDao) List(ctx context.Context, req model.Request) ([]model.Deli
 
 func (d *DeliveryDao) GetByOrderID(ctx context.Context, orderID uint64) (*model.Delivery, error) {
 	var delivery model.Delivery
-	tx := d.db.WithContext(ctx).Model(&model.Delivery{}).Where("order_id = ?", orderID).Order("id desc").Take(&delivery)
+	tx := d.db.WithContext(ctx).Model(&model.Delivery{}).Where("order_id = ?", orderID).Order("create_time desc").Take(&delivery)
 	if tx.Error != nil {
 		if tx.Error == gorm.ErrRecordNotFound {
 			return nil, retcode.NewError(e.ErrorOrderNotFound, "delivery not found")

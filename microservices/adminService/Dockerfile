@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 FROM golang:1.26-alpine AS builder
 WORKDIR /src
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64

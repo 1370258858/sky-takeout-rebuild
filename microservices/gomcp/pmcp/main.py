@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 from contextlib import AsyncExitStack
+from typing import List, Dict, Optional
 from openai import OpenAI
 
 from mcp import ClientSession
@@ -26,9 +27,19 @@ MCP_GOODS_SERVER_URL = _resolve_url("goods")
 MCP_DELIVERY_SERVER_URL = _resolve_url("delivery")
 
 MODEL = os.getenv("LLM_MODEL","deepseek-v4-pro")
+MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "30"))
 
 llm = OpenAI( api_key="sk-3dad08434cf2403199dce62cd7c1b972",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",)
+
+SYSTEM_PROMPT = (
+    "你是订单助手。若需要下单请调用 create_order 工具。"
+    "若需要查看购物车请调用 cart_detail 工具。"
+    "若需要修改购物车请调用 update_cart 工具。"
+    "若需要删除购物车请调用 delete_cart 工具。"
+    "若需要查看商品列表请调用 list_goods 工具。"
+    "工具返回后再给最终中文答复。"
+)
 
 
 
@@ -81,6 +92,12 @@ def _parse_tool_arguments(raw_args):
 
     return parsed if isinstance(parsed, dict) else {}
 
+
+def _trim_history(history: List[Dict], max_messages: int) -> List[Dict]:
+    if len(history) <= max_messages:
+        return history
+    return history[-max_messages:]
+
 # 帮我单一个鸡排订单，要有两块鸡排，一瓶可乐，
 # 1.mcp提供商品总列表（包括库存余量,也就是检查鸡排库存大于2，可乐大于1)，session 获得了这个mcp接口， llm填充参数，下单
 # 2.返回结果
@@ -88,7 +105,10 @@ def _parse_tool_arguments(raw_args):
 # - llm 判断库存是否够，够的话 ，这个应该通过提示词告诉llm，下单前的检查步骤
 # - 调用下单mcp
 
-async def run_agent_once(user_query: str):
+async def run_agent_once(user_query: str, history: Optional[List[Dict]] = None):
+    if history is None:
+        history = []
+
     # 1) 同时连接多个 MCP 服务，并保持 session 生命周期覆盖整个函数逻辑。
     async with AsyncExitStack() as stack:
         order_read, order_write, _ = await stack.enter_async_context(streamablehttp_client(MCP_ORDER_SERVER_URL))
@@ -118,16 +138,7 @@ async def run_agent_once(user_query: str):
         llm_tools = [mcp_tool_to_openai_schema(t) for t in tools]
         print(f"工具清单：{llm_tools} \n")
 
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是订单助手。若需要下单请调用 create_order 工具。"
-                    "工具返回后再给最终中文答复。"
-                ),
-            },
-            {"role": "user", "content": user_query},
-        ]
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_query}]
 
         # 3) 先让 LLM 决定要不要调工具。
         resp = llm.chat.completions.create(
@@ -188,15 +199,28 @@ async def run_agent_once(user_query: str):
                 messages=messages,
                 temperature=0,
             )
-            return final_resp.choices[0].message.content
+            final_text = final_resp.choices[0].message.content or "未生成回答"
+            history.append({"role": "user", "content": user_query})
+            history.append({"role": "assistant", "content": final_text})
+            history[:] = _trim_history(history, MAX_HISTORY_MESSAGES)
+            return final_text
 
         # 没有工具调用就直接回答。
-        return msg.content or "未生成回答"
+        answer = msg.content or "未生成回答"
+        history.append({"role": "user", "content": user_query})
+        history.append({"role": "assistant", "content": answer})
+        history[:] = _trim_history(history, MAX_HISTORY_MESSAGES)
+        return answer
 
 if __name__ == "__main__":
     # query = "帮我创建一个订单：userId=1, goodId=51, amount=56, addressBookId=1"
+    chat_history: List[Dict] = []
     while True:
         query = input("请输入您的需求：")
         if not query:
             break
-        print(asyncio.run(run_agent_once(query)))
+        if query.strip() in {"/reset", "/clear"}:
+            chat_history.clear()
+            print("上下文已清空。")
+            continue
+        print(asyncio.run(run_agent_once(query, chat_history)))

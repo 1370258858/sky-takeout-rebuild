@@ -1,0 +1,51 @@
+server:
+  name: order-tools
+  version: v1.0.0
+  address: ":8001"
+  path: "/mcp"
+
+tools:
+  - name: create_order
+    description: |
+      Create a takeout order. Two modes:
+      Mode 1: From goods list (cartId equals 0 or omit) - Required: userId, goodIds, amount, addressBookId
+      Mode 2: From shopping cart (cartId non-zero) - Required: userId, cartId, addressBookId
+      Optional: remark, phone, address, userName, consignee, payMethod, estimatedDeliveryTime, packAmount, tablewareNumber, tablewareStatus
+    handler: CreateOrder
+
+  - name: create_cart
+    description: "Create cart items. Required: userId, goodIds, quantity. Optional: name, image, flavor, amount."
+    handler: CreateCart
+
+  - name: cart_detail
+    description: "Get shopping cart details. Required: userId."
+    handler: CartDetail
+
+  - name: update_cart
+    description: "Update cart item quantity/flavor/amount. Required: userId, cartId, quantity."
+    handler: UpdateCart
+
+  - name: delete_cart
+    description: "Delete cart items. Required: userId, cartId (or omit cartId to delete all)."
+    handler: DeleteCart
+
+  - name: refund_order
+    description: "Refund a paid order. Required: order ID. Optional: reason."
+    handler: RefundOrder
+
+  - name: get_order_detail
+    description: "Get order details by order ID."
+    handler: GetOrderDetail
+
+  - name: cancel_order
+    description: "Cancel an order. Required: order ID. Optional: reason."
+    handler: CancelOrder
+
+  - name: pay_order
+    description: "Process order payment. Required: order ID, payStatus (1=success, 2=failed, 3=timeout)."
+    handler: PayOrder
+
+  - name: list_orders
+    description: "List orders by user. Required: userId. Optional: status filter."
+    handler: ListOrders
+
