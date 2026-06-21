@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"context"
-	"fmt"
 	"strconv"
 
 	"sky-takeout/microservices/orderService/common/retcode"
@@ -18,29 +16,6 @@ type OrderController struct {
 
 func NewOrderController(service service.OrderService) *OrderController {
 	return &OrderController{Service: service}
-}
-
-// CreateForMCP exposes create order ability for MCP adapters.
-// 
-// Two ways to create an order:
-// 
-// Mode 1: Create from goods list
-//   - Required fields: userId, goodIds, amount, addressBookId
-//   - Set cartId to 0 or omit it
-//   - quantity defaults to 1 if not provided
-// 
-// Mode 2: Create from shopping cart
-//   - Required fields: userId, cartId (non-zero), addressBookId
-//   - Do NOT provide goodIds or amount (they will be fetched from cart)
-//   - quantity can optionally override cart's quantity, or omit to use cart's quantity
-// 
-// Optional fields (both modes): remark, phone, address, userName, consignee, payMethod, 
-//   estimatedDeliveryTime (format: "2006-01-02 15:04:05"), packAmount, tablewareNumber, tablewareStatus
-func (oc *OrderController) CreateForMCP(ctx context.Context, req *model.CreateOrderRequest) (*model.Order, error) {
-	if req == nil {
-		return nil, fmt.Errorf("invalid request")
-	}
-	return oc.Service.Create(ctx, req)
 }
 
 func (oc *OrderController) InitApiRouter(parent *gin.RouterGroup) {

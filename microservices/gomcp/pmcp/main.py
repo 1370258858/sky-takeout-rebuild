@@ -7,7 +7,9 @@ from openai import OpenAI
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
-from a import normalize_mcp_result , get_field
+from a import normalize_mcp_result , get_field,mcp_tool_to_openai_schema,add_to_history,_parse_tool_arguments
+
+# ============ 步骤 1: 加载 MCP 服务配置 ============
 # 读取json文件
 with open("./mcp_tool_routes.json", "r") as f:
     json_data = json.load(f)
@@ -15,6 +17,7 @@ with open("./mcp_tool_routes.json", "r") as f:
 services_cfg = json_data.get("services", {})
 
 def _resolve_url(service_name: str) -> str:
+    """从配置文件或环境变量中解析 MCP 服务 URL"""
     cfg = services_cfg.get(service_name, {})
     env_name = cfg.get("urlEnv")
     default_url = cfg.get("defaultUrl")
@@ -22,16 +25,20 @@ def _resolve_url(service_name: str) -> str:
         return os.getenv(env_name, default_url)
     return default_url
 
+# 解析三个微服务的 MCP 服务器地址
 MCP_ORDER_SERVER_URL = _resolve_url("order")
 MCP_GOODS_SERVER_URL = _resolve_url("goods")
 MCP_DELIVERY_SERVER_URL = _resolve_url("delivery")
 
+# ============ 步骤 2: 初始化 LLM 模型 ============
 MODEL = os.getenv("LLM_MODEL","deepseek-v4-pro")
-MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "30"))
+MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "30"))  # 对话历史最大保留条数
 
+# 使用阿里云 DashScope 兼容 OpenAI API
 llm = OpenAI( api_key="sk-3dad08434cf2403199dce62cd7c1b972",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",)
 
+# LLM 系统提示词，指导模型何时调用哪些工具
 SYSTEM_PROMPT = (
     "你是订单助手。若需要下单请调用 create_order 工具。"
     "若需要查看购物车请调用 cart_detail 工具。"
@@ -44,26 +51,10 @@ SYSTEM_PROMPT = (
 
 
 
-def mcp_tool_to_openai_schema(tool):
-    name = get_field(tool, "name")
-    description = get_field(tool, "description", default="") or ""
-    input_schema = get_field(
-        tool, "inputSchema", "input_schema",
-        default={"type": "object", "properties": {}}
-    )
-    return {
-        "type": "function",
-        "function": {
-            "name": name,
-            "description": description,
-            "parameters": input_schema,
-        },
-    }
-
 
 
 def _tool_result_to_payload(tool_result):
-    # Normalize tool result so it can be safely sent back to the model.
+    """将 MCP 工具执行结果规范化，以便回传给 LLM"""
     content = get_field(tool_result, "content", default=[])
     if not content:
         return {"ok": True, "content": []}
@@ -76,24 +67,9 @@ def _tool_result_to_payload(tool_result):
             payload.append({"type": ctype, "text": text})
     return {"ok": True, "content": payload}
 
-def _parse_tool_arguments(raw_args):
-    # MCP tool arguments must be a JSON object; coerce invalid shapes to {}.
-    if raw_args is None:
-        return {}
-    if isinstance(raw_args, dict):
-        return raw_args
-    if not isinstance(raw_args, str):
-        return {}
-
-    try:
-        parsed = json.loads(raw_args)
-    except Exception:
-        return {}
-
-    return parsed if isinstance(parsed, dict) else {}
-
 
 def _trim_history(history: List[Dict], max_messages: int) -> List[Dict]:
+    """限制对话历史的长度，防止上下文过长"""
     if len(history) <= max_messages:
         return history
     return history[-max_messages:]
@@ -105,78 +81,74 @@ def _trim_history(history: List[Dict], max_messages: int) -> List[Dict]:
 # - llm 判断库存是否够，够的话 ，这个应该通过提示词告诉llm，下单前的检查步骤
 # - 调用下单mcp
 
+# ============ 步骤 4: 主代理函数 ============
 async def run_agent_once(user_query: str, history: Optional[List[Dict]] = None):
+    """执行一次代理循环：用户输入 -> LLM 判断 -> 调用工具 -> 生成回复"""
     if history is None:
         history = []
 
-    # 1) 同时连接多个 MCP 服务，并保持 session 生命周期覆盖整个函数逻辑。
+    # 步骤 4.1: 并发连接多个 MCP 微服务，使用 AsyncExitStack 管理异步上下文生命周期
     async with AsyncExitStack() as stack:
+        # 建立 HTTP 双向流连接
         order_read, order_write, _ = await stack.enter_async_context(streamablehttp_client(MCP_ORDER_SERVER_URL))
         goods_read, goods_write, _ = await stack.enter_async_context(streamablehttp_client(MCP_GOODS_SERVER_URL))
         delivery_read, delivery_write, _ = await stack.enter_async_context(streamablehttp_client(MCP_DELIVERY_SERVER_URL))
 
+        # 为每个微服务创建 MCP 客户端会话
         order_session = await stack.enter_async_context(ClientSession(order_read, order_write))
         goods_session = await stack.enter_async_context(ClientSession(goods_read, goods_write))
         delivery_session = await stack.enter_async_context(ClientSession(delivery_read, delivery_write))
 
+        # 初始化所有会话
         await order_session.initialize()
         await goods_session.initialize()
         await delivery_session.initialize()
 
-        # 2) 汇总工具，并记录每个工具对应的 service session。
-        tool_to_session = {}
+        # 步骤 4.2: 从所有 MCP 服务汇总可用工具，并记录每个工具对应的源服务
+        tool_to_session = {}  # 工具名 -> MCP 会话的映射
         tools = []
         for session in (order_session, goods_session, delivery_session):
-            result = await session.list_tools()
+            result = await session.list_tools()  # 获取该服务的所有工具
             service_tools = get_field(result, "tools", default=result) or []
             for t in service_tools:
                 name = get_field(t, "name")
                 if name and name not in tool_to_session:
-                    tool_to_session[name] = session
+                    tool_to_session[name] = session  # 记录工具源
                     tools.append(t)
 
+        # 转换成 OpenAI API 兼容的函数定义
         llm_tools = [mcp_tool_to_openai_schema(t) for t in tools]
         print(f"工具清单：{llm_tools} \n")
 
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_query}]
+        # 步骤 4.3: 构建消息历史，包含系统提示、对话历史和新用户输入
+       history_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_query}]
 
-        # 3) 先让 LLM 决定要不要调工具。
-        resp = llm.chat.completions.create(
+        # 步骤 4.4: 第一轮 LLM 调用：判断是否需要调用工具
+        resp = llm.chat.completions.create( 
             model=MODEL,
-            messages=messages,
-            tools=llm_tools,
+            messages=history_messages,
+            tools=llm_tools,  # 提供可用工具列表给 LLM
             temperature=0,
         )
         msg = resp.choices[0].message
         print("LLM 回复：{}", msg.content or "", "工具调用：", msg.tool_calls or [])
         tool_calls = msg.tool_calls or []
 
-        # 4) 若 LLM 发起工具调用 -> 路由到对应 MCP session。
+        # 步骤 4.5: 若 LLM 决定调用工具，则执行工具调用
         if tool_calls:
-            messages.append({
-                "role": "assistant",
-                "content": msg.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in tool_calls
-                ],
-            })
-
+            # 将 LLM 助手消息和工具调用追加到消息历史
+            add_to_history(history_messages,msg,tool_calls)
+            # 步骤 4.6: 逐个执行工具调用，路由到对应的 MCP 会话
             for tc in tool_calls:
                 name = tc.function.name
                 args = _parse_tool_arguments(tc.function.arguments)
 
+                # 根据工具名查找目标 MCP 会话，默认使用 order_session
                 target_session = tool_to_session.get(name, order_session)
                 try:
+                    # 调用远程 MCP 工具
                     tool_result = await target_session.call_tool(name, arguments=args)
-                    # MCP 返回内容转成字符串回填给 LLM。
+                    # 规范化 MCP 返回结果
                     payload = normalize_mcp_result(tool_result)
                 except Exception as e:
                     payload = {
@@ -185,42 +157,47 @@ async def run_agent_once(user_query: str, history: Optional[List[Dict]] = None):
                         "arguments": args,
                     }
 
+                # 将工具执行结果转为 JSON 字符串，回填给 LLM
                 content_text = json.dumps(payload, ensure_ascii=False)
 
-                messages.append({
+                add_to_history.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
                     "content": content_text,
                 })
 
-            # 5) 把工具结果喂回 LLM，让它生成最终答复。
+            # 步骤 4.7: 第二轮 LLM 调用：让 LLM 基于工具结果生成最终回复
             final_resp = llm.chat.completions.create(
                 model=MODEL,
-                messages=messages,
+                messages=add_to_history,
                 temperature=0,
             )
             final_text = final_resp.choices[0].message.content or "未生成回答"
+            # 将本轮对话追加到历史记录
             history.append({"role": "user", "content": user_query})
             history.append({"role": "assistant", "content": final_text})
             history[:] = _trim_history(history, MAX_HISTORY_MESSAGES)
             return final_text
 
-        # 没有工具调用就直接回答。
+        # 步骤 4.8: 若 LLM 无需调用工具，直接返回 LLM 回复
         answer = msg.content or "未生成回答"
         history.append({"role": "user", "content": user_query})
         history.append({"role": "assistant", "content": answer})
         history[:] = _trim_history(history, MAX_HISTORY_MESSAGES)
         return answer
 
+# ============ 步骤 5: 主程序入口 ============
 if __name__ == "__main__":
-    # query = "帮我创建一个订单：userId=1, goodId=51, amount=56, addressBookId=1"
-    chat_history: List[Dict] = []
+    # 示例用户输入: "帮我创建一个订单：userId=1, goodId=51, amount=56, addressBookId=1"
+    chat_history: List[Dict] = []  # 维护对话历史以支持多轮对话
     while True:
         query = input("请输入您的需求：")
         if not query:
             break
+        # 支持清空历史的特殊命令
         if query.strip() in {"/reset", "/clear"}:
             chat_history.clear()
             print("上下文已清空。")
             continue
+        # 执行代理循环，并打印返回结果
         print(asyncio.run(run_agent_once(query, chat_history)))

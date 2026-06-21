@@ -1,7 +1,7 @@
 server:
   name: order-tools
   version: v1.0.0
-  address: ":8001"
+  address: ":8004"
   path: "/mcp"
 
 tools:

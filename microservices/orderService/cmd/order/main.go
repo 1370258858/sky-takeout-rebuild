@@ -125,14 +125,14 @@ func main() {
 	orderCtrl.InitApiRouter(api)
 
 	// Load MCP configuration from file
-	mcpConfig, err := LoadMCPConfig("")
+	mcpConfig, err := LoadMCPConfig("./mcp-config.yaml")
 	if err != nil {
 		log.Printf("warning: failed to load MCP config, using defaults: %v", err)
 		mcpConfig = &MCPConfig{
 			Server: MCPServerConfig{
 				Name:    "order-tools",
 				Version: "v1.0.0",
-				Address: ":8001",
+				Address: ":8004",
 				Path:    "/mcp",
 			},
 		}
@@ -147,10 +147,10 @@ func main() {
 		Name:    mcpConfig.Server.Name,
 		Version: mcpConfig.Server.Version,
 	}, nil)
-
 	// Register all tools from configuration
 	for _, toolCfg := range mcpConfig.Tools {
 		switch toolCfg.Handler {
+		//change to Elicitation way to register tools
 		case "CreateOrder":
 			mcp.AddTool(mcpServer, &mcp.Tool{Name: toolCfg.Name, Description: toolCfg.Description}, NewCreateOrderToolHandler)
 		case "CreateCart":

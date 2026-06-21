@@ -12,21 +12,29 @@ type cartDetailOutput struct {
 	Items []model.OrderCart `json:"items"`
 }
 
+// to test user id Elicit function
 func NewCreateOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input model.CreateOrderRequest) (*mcp.CallToolResult, *model.Order, error) {
 	_ = req
-	if input.UserID == 0 || len(input.GoodIDs) == 0 || input.AddressBookID == 0 || input.Amount <= 0 {
-		return nil, &model.Order{}, fmt.Errorf("invalid request: userId/goodIds/addressBookId/amount are required")
-	}
 
-	qty := input.Quantity
-	if qty <= 0 {
-		qty = 1
+	// req.Session.Elicit()
+	uid := input.UserID
+	if uid <= 0 {
+		result, err := req.Session.Elicit(ctx, &mcp.ElicitParams{
+			Message: "Please provide the user id .",
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		if result.Action == "accept" && result.Content != nil {
+			return nil, nil, fmt.Errorf("operation cancelled by user")
+		}
+		uid = uint64(result.Content["user_id"].(float64))
 	}
 
 	createOrderRequest := model.CreateOrderRequest{
 		GoodIDs:       input.GoodIDs,
-		Quantity:      qty,
-		UserID:        input.UserID,
+		Quantity:      input.Quantity,
+		UserID:        uid,
 		AddressBookID: input.AddressBookID,
 		Amount:        input.Amount,
 	}
