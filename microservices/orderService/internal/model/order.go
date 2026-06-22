@@ -5,7 +5,7 @@ import "time"
 // Request defines query params for order list.
 type Request struct {
 	UserID uint64 `form:"userId" json:"userId"`
-	Status *int   `form:"status" json:"status"`
+	Status int    `form:"status" json:"status"`
 }
 
 // CreateOrderRequest defines the request for creating an order.

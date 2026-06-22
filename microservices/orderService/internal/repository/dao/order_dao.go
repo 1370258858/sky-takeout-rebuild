@@ -24,10 +24,10 @@ func (d *OrderDao) List(ctx context.Context, req model.Request) ([]model.Order, 
 	if req.UserID > 0 {
 		query = query.Where("user_id = ?", req.UserID)
 	}
-	if req.Status != nil {
-		query = query.Where("status = ?", *req.Status)
+	if req.Status != 0 {
+		query = query.Where("status = ?", req.Status)
 	}
-	tx := query.Order("id desc").Find(&orders)
+	tx := query.Order("order_time desc").Find(&orders)
 	if tx.Error != nil {
 		return nil, retcode.NewError(e.MysqlERR, "list order failed")
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	mcptool "sky-takeout/microservices/orderService/common/mcptool"
 	"sky-takeout/microservices/orderService/internal/model"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -14,21 +15,33 @@ type cartDetailOutput struct {
 
 // to test user id Elicit function
 func NewCreateOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input model.CreateOrderRequest) (*mcp.CallToolResult, *model.Order, error) {
-	_ = req
-
 	// req.Session.Elicit()
 	uid := input.UserID
 	if uid <= 0 {
 		result, err := req.Session.Elicit(ctx, &mcp.ElicitParams{
-			Message: "Please provide the user id .",
+			Message: "mcp 的 Elicit模块需要你提供USERID",
+			RequestedSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"userId": map[string]any{
+						"type":        "integer",
+						"description": "用户ID（大于0的整数）",
+					},
+				},
+				"required": []string{"userId"},
+			},
 		})
 		if err != nil {
 			return nil, nil, err
 		}
-		if result.Action == "accept" && result.Content != nil {
+		if result.Action != "accept" || result.Content == nil {
 			return nil, nil, fmt.Errorf("operation cancelled by user")
 		}
-		uid = uint64(result.Content["user_id"].(float64))
+
+		uid, err = mcptool.MustUint64(result.Content, "userId", "user_id")
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid elicitation result: %w", err)
+		}
 	}
 
 	createOrderRequest := model.CreateOrderRequest{
@@ -277,14 +290,13 @@ func NewListOrdersToolHandler(ctx context.Context, req *mcp.CallToolRequest, inp
 		return nil, map[string]any{}, fmt.Errorf("invalid request: userId must be greater than 0")
 	}
 
-	var status *int
+	var status int
 	if s, ok := input["status"]; ok {
 		switch v := s.(type) {
 		case float64:
-			st := int(v)
-			status = &st
+			status = int(v)
 		case int:
-			status = &v
+			status = v
 		}
 	}
 

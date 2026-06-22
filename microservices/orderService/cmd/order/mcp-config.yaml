@@ -7,10 +7,13 @@ server:
 tools:
   - name: create_order
     description: |
-      Create a takeout order. Two modes:
-      Mode 1: From goods list (cartId equals 0 or omit) - Required: userId, goodIds, amount, addressBookId
-      Mode 2: From shopping cart (cartId non-zero) - Required: userId, cartId, addressBookId
-      Optional: remark, phone, address, userName, consignee, payMethod, estimatedDeliveryTime, packAmount, tablewareNumber, tablewareStatus
+      Create a takeout order. Two modes — pick exactly one:
+
+      Mode 1 (goods list): cartId must be 0 or omitted. Required: goodIds, amount, addressBookId. Do NOT pass cartId.
+      Mode 2 (shopping cart): cartId must be non-zero. Required: cartId, addressBookId. Do NOT pass goodIds.
+
+      userId is always optional — omit it or pass 0 and the server will prompt for it via Elicit.
+      Optional for both modes: remark, phone, address, userName, consignee, payMethod, estimatedDeliveryTime, packAmount, tablewareNumber, tablewareStatus.
     handler: CreateOrder
 
   - name: create_cart

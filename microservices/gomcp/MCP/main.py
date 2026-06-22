@@ -16,6 +16,7 @@ from pyexpat.errors import messages
 from pyexpat.errors import messages
 import re
 from typing import List, Dict, Optional
+from elicitation import elicitation_handler
 
 from mcp import ClientSession,  types
 from mcp.client.streamable_http import streamablehttp_client
@@ -48,17 +49,26 @@ MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-pro")
 MODEL_MAX_HISTORY = os.getenv("MODEL_MAX_HISTORY", "10")
 llm = OpenAI(api_key="sk-3dad08434cf2403199dce62cd7c1b972",base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
 
+
 SYSTEM_PROMPT = (
     "你是订单助手。若需要下单请调用 create_order 工具。"
     "若需要查看购物车请调用 cart_detail 工具。"
     "若需要修改购物车请调用 update_cart 工具。"
     "若需要删除购物车请调用 delete_cart 工具。"
     "若需要查看商品列表请调用 list_goods 工具。"
+    "创建订单时禁止臆造 userId。若用户未提供 userId，请在 create_order 参数中传 userId=0，由 MCP 服务端通过 Elicit 继续补充。"
     "工具返回后再给最终中文答复。"
 )
+
+
+
+
 # agent call  return should be total call need some thing todo
-def agent_call(history, user_query, tools=None) -> any:
-    message_content = [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_query}]
+def agent_call(history, user_query=None, tools=None, tool_choice=None) -> any:
+    message_content = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
+    if user_query is not None:
+        message_content.append({"role": "user", "content": user_query})
+
     req = {
         "model": MODEL_NAME,
         "messages": message_content,
@@ -66,9 +76,10 @@ def agent_call(history, user_query, tools=None) -> any:
     }
     if tools:
         req["tools"] = tools
+    if tool_choice is not None:
+        req["tool_choice"] = tool_choice
 
     resp = llm.chat.completions.create(**req)
-    print(f"agent 回复：{resp}")
     return resp
 
 
@@ -78,7 +89,9 @@ async def main():
 
     async with AsyncExitStack() as stack:
         order_read, order_write, _ = await stack.enter_async_context(streamablehttp_client(MCP_ORDER_SERVER_URL))
-        order_session = await stack.enter_async_context(ClientSession(order_read, order_write))
+        order_session = await stack.enter_async_context(
+            ClientSession(order_read, order_write, elicitation_callback=elicitation_handler)
+        )
         await order_session.initialize()
 
         order_tools_result = await order_session.list_tools()
@@ -90,8 +103,10 @@ async def main():
             query = input("我是一个AI助手,有什么需求吗？")
             if not query:
                 break
-            resp = agent_call(history=history, user_query=query, tools=llm_tools)
             history.append({"role": "user", "content": query})
+            forced_tool_choice = None
+           
+            resp = agent_call(history=history, tools=llm_tools, tool_choice=forced_tool_choice)
 
             choice = resp.choices[0] if resp.choices else None
             # 取一个可能不存在属性
@@ -99,7 +114,10 @@ async def main():
                 tool_calls = choice.message.tool_calls
             else:
                 tool_calls = None
+
             if tool_calls:
+                 # 将 assistant 的 tool_calls 回填到历史中，供下一轮消费 tool 结果
+                 add_to_history(history, choice.message, tool_calls)
                  #   调用mcp方法
                  for tc in tool_calls:
                     name = tc.function.name
@@ -115,8 +133,12 @@ async def main():
                     "content": content_text,
                 })
             # 根据调用结果生成回复
-            resp = agent_call(history=history)
-            print(resp)
+            resp = agent_call(history=history, tools=llm_tools)
+            # 取一个可能不存在属性
+            choice = resp.choices[0] if resp.choices else None
+            if choice and choice.message:
+                history.append({"role": "assistant", "content": choice.message.content or ""})
+                print(choice.message.content)
 
 
 
