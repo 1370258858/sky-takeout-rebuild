@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sky-takeout/microservices/deliveryService/internal/model"
+	mcpCommon "sky-takeout/microservices/mcpcommonUnit"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -13,30 +14,17 @@ func NewListDeliveriesToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 	_ = req
 
 	var orderId *uint64
-	if orderIdVal, ok := input["orderId"]; ok {
-		switch v := orderIdVal.(type) {
-		case float64:
-			id := uint64(v)
-			orderId = &id
-		case int:
-			id := uint64(v)
-			orderId = &id
-		case string:
-			var id uint64
-			fmt.Sscanf(v, "%d", &id)
-			orderId = &id
-		}
+	if id, ok, err := mcpCommon.GetUint64Param(input, "orderId"); err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
+	} else if ok {
+		orderId = &id
 	}
 
 	var status *int
-	if statusVal, ok := input["status"]; ok {
-		switch v := statusVal.(type) {
-		case float64:
-			s := int(v)
-			status = &s
-		case int:
-			status = &v
-		}
+	if s, ok, err := mcpCommon.GetIntParam(input, "status"); err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
+	} else if ok {
+		status = &s
 	}
 
 	listReq := &model.Request{
@@ -58,25 +46,9 @@ func NewListDeliveriesToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 // 获取配送详情
 func NewGetDeliveryDetailToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Delivery, error) {
 	_ = req
-	orderId, ok := input["orderId"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: orderId is required")
-	}
-
-	var oid uint64
-	switch v := orderId.(type) {
-	case float64:
-		oid = uint64(v)
-	case int:
-		oid = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &oid)
-	default:
-		return nil, nil, fmt.Errorf("invalid orderId type")
-	}
-
-	if oid == 0 {
-		return nil, nil, fmt.Errorf("invalid request: orderId must be greater than 0")
+	oid, err := requireOrderID(input)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	delivery, err := DeliveryCtrl.Service.GetByOrderID(ctx, oid)
@@ -89,21 +61,9 @@ func NewGetDeliveryDetailToolHandler(ctx context.Context, req *mcp.CallToolReque
 // 创建配送
 func NewCreateDeliveryToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Delivery, error) {
 	_ = req
-	orderId, ok := input["orderId"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: orderId is required")
-	}
-
-	var oid uint64
-	switch v := orderId.(type) {
-	case float64:
-		oid = uint64(v)
-	case int:
-		oid = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &oid)
-	default:
-		return nil, nil, fmt.Errorf("invalid orderId type")
+	oid, err := requireOrderID(input)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	createReq := &model.CreateDeliveryRequest{
@@ -159,36 +119,17 @@ func NewCreateDeliveryToolHandler(ctx context.Context, req *mcp.CallToolRequest,
 // 更新配送状态
 func NewUpdateDeliveryStatusToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Delivery, error) {
 	_ = req
-	orderId, ok := input["orderId"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: orderId is required")
+	oid, err := requireOrderID(input)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	var oid uint64
-	switch v := orderId.(type) {
-	case float64:
-		oid = uint64(v)
-	case int:
-		oid = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &oid)
-	default:
-		return nil, nil, fmt.Errorf("invalid orderId type")
+	st, ok, err := mcpCommon.GetIntParam(input, "status")
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
 	}
-
-	status, ok := input["status"]
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid request: status is required")
-	}
-
-	var st int
-	switch v := status.(type) {
-	case float64:
-		st = int(v)
-	case int:
-		st = v
-	default:
-		return nil, nil, fmt.Errorf("invalid status type")
 	}
 
 	updateReq := &model.UpdateStatusRequest{Status: st}
@@ -202,31 +143,17 @@ func NewUpdateDeliveryStatusToolHandler(ctx context.Context, req *mcp.CallToolRe
 // 更新配送地址
 func NewUpdateDeliveryAddressToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Delivery, error) {
 	_ = req
-	orderId, ok := input["orderId"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: orderId is required")
+	oid, err := requireOrderID(input)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	var oid uint64
-	switch v := orderId.(type) {
-	case float64:
-		oid = uint64(v)
-	case int:
-		oid = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &oid)
-	default:
-		return nil, nil, fmt.Errorf("invalid orderId type")
+	addressStr, ok, err := mcpCommon.GetStringParam(input, "address")
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
 	}
-
-	address, ok := input["address"]
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid request: address is required")
-	}
-
-	addressStr, ok := address.(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid address type")
 	}
 
 	updateReq := &model.UpdateAddressRequest{DeliveryAddress: addressStr}
@@ -235,4 +162,18 @@ func NewUpdateDeliveryAddressToolHandler(ctx context.Context, req *mcp.CallToolR
 		return nil, nil, err
 	}
 	return nil, delivery, nil
+}
+
+func requireOrderID(input map[string]any) (uint64, error) {
+	v, ok, err := mcpCommon.GetUint64Param(input, "orderId")
+	if err != nil {
+		return 0, fmt.Errorf("invalid request: %w", err)
+	}
+	if !ok {
+		return 0, fmt.Errorf("invalid request: orderId is required")
+	}
+	if v == 0 {
+		return 0, fmt.Errorf("invalid request: orderId must be greater than 0")
+	}
+	return v, nil
 }

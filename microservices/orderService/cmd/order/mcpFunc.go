@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	mcpCommon "sky-takeout/microservices/mcpcommonUnit"
 	mcptool "sky-takeout/microservices/orderService/common/mcptool"
 	"sky-takeout/microservices/orderService/internal/model"
 
@@ -156,25 +157,9 @@ func NewRefundOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, in
 // 获取订单详情
 func NewDetailToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Order, error) {
 	_ = req
-	orderID, ok := input["id"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: id is required")
-	}
-
-	var id uint64
-	switch v := orderID.(type) {
-	case float64:
-		id = uint64(v)
-	case int:
-		id = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &id)
-	default:
-		return nil, nil, fmt.Errorf("invalid id type")
-	}
-
-	if id == 0 {
-		return nil, nil, fmt.Errorf("invalid request: id must be greater than 0")
+	id, err := requireUint64Param(input, "id")
+	if err != nil {
+		return nil, nil, err
 	}
 
 	order, err := orderCtrl.Service.Detail(ctx, id)
@@ -188,30 +173,16 @@ func NewDetailToolHandler(ctx context.Context, req *mcp.CallToolRequest, input m
 // 取消订单
 func NewCancelOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Order, error) {
 	_ = req
-	orderID, ok := input["id"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: id is required")
-	}
-
-	var id uint64
-	switch v := orderID.(type) {
-	case float64:
-		id = uint64(v)
-	case int:
-		id = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &id)
-	default:
-		return nil, nil, fmt.Errorf("invalid id type")
-	}
-
-	if id == 0 {
-		return nil, nil, fmt.Errorf("invalid request: id must be greater than 0")
+	id, err := requireUint64Param(input, "id")
+	if err != nil {
+		return nil, nil, err
 	}
 
 	reason := ""
-	if r, ok := input["reason"]; ok {
-		reason = r.(string)
+	if r, ok, err := mcpCommon.GetStringParam(input, "reason"); err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
+	} else if ok {
+		reason = r
 	}
 
 	cancelReq := &model.CancelOrderRequest{Reason: reason}
@@ -226,35 +197,16 @@ func NewCancelOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, in
 // 支付订单
 func NewPayOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, *model.Order, error) {
 	_ = req
-	orderID, ok := input["id"]
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid request: id is required")
-	}
-
-	var id uint64
-	switch v := orderID.(type) {
-	case float64:
-		id = uint64(v)
-	case int:
-		id = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &id)
-	default:
-		return nil, nil, fmt.Errorf("invalid id type")
-	}
-
-	if id == 0 {
-		return nil, nil, fmt.Errorf("invalid request: id must be greater than 0")
+	id, err := requireUint64Param(input, "id")
+	if err != nil {
+		return nil, nil, err
 	}
 
 	payStatus := 1 // default to success
-	if ps, ok := input["payStatus"]; ok {
-		switch v := ps.(type) {
-		case float64:
-			payStatus = int(v)
-		case int:
-			payStatus = v
-		}
+	if ps, ok, err := mcpCommon.GetIntParam(input, "payStatus"); err != nil {
+		return nil, nil, fmt.Errorf("invalid request: %w", err)
+	} else if ok {
+		payStatus = ps
 	}
 
 	payReq := &model.PayOrderRequest{PayStatus: payStatus}
@@ -269,35 +221,16 @@ func NewPayOrderToolHandler(ctx context.Context, req *mcp.CallToolRequest, input
 // 列表订单
 func NewListOrdersToolHandler(ctx context.Context, req *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, map[string]any, error) {
 	_ = req
-	userID, ok := input["userId"]
-	if !ok {
-		return nil, map[string]any{}, fmt.Errorf("invalid request: userId is required")
-	}
-
-	var uid uint64
-	switch v := userID.(type) {
-	case float64:
-		uid = uint64(v)
-	case int:
-		uid = uint64(v)
-	case string:
-		fmt.Sscanf(v, "%d", &uid)
-	default:
-		return nil, map[string]any{}, fmt.Errorf("invalid userId type")
-	}
-
-	if uid == 0 {
-		return nil, map[string]any{}, fmt.Errorf("invalid request: userId must be greater than 0")
+	uid, err := requireUint64Param(input, "userId")
+	if err != nil {
+		return nil, map[string]any{}, err
 	}
 
 	var status int
-	if s, ok := input["status"]; ok {
-		switch v := s.(type) {
-		case float64:
-			status = int(v)
-		case int:
-			status = v
-		}
+	if s, ok, err := mcpCommon.GetIntParam(input, "status"); err != nil {
+		return nil, map[string]any{}, fmt.Errorf("invalid request: %w", err)
+	} else if ok {
+		status = s
 	}
 
 	listReq := &model.Request{
@@ -310,4 +243,18 @@ func NewListOrdersToolHandler(ctx context.Context, req *mcp.CallToolRequest, inp
 	}
 
 	return nil, map[string]any{"orders": orders, "count": len(orders)}, nil
+}
+
+func requireUint64Param(input map[string]any, key string, aliases ...string) (uint64, error) {
+	v, ok, err := mcpCommon.GetUint64Param(input, key, aliases...)
+	if err != nil {
+		return 0, fmt.Errorf("invalid request: %w", err)
+	}
+	if !ok {
+		return 0, fmt.Errorf("invalid request: %s is required", key)
+	}
+	if v == 0 {
+		return 0, fmt.Errorf("invalid request: %s must be greater than 0", key)
+	}
+	return v, nil
 }

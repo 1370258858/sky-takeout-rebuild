@@ -6,9 +6,9 @@ server:
 
 tools:
   - name: list_goods
-    description: "List all available goods/dishes. Returns object with dishes array and count."
+    description: "查询全部可售商品/菜品。返回包含 dishes 数组和 count 的对象。"
     handler: ListGoods
 
   - name: get_good_detail
-    description: "Get goods/dish details by ID. Required: id (dish ID)."
+    description: "根据ID获取商品/菜品详情。必填：id（菜品ID）。"
     handler: GetGoodDetail

@@ -6,29 +6,29 @@ server:
 
 tools:
   - name: list_deliveries
-    description: "List deliveries by order or status. Optional: orderId, status filter. Returns object with deliveries array."
+    description: "按订单或状态查询配送列表。可选：orderId、status 过滤。返回包含 deliveries 数组的对象。"
     handler: ListDeliveries
 
   - name: get_delivery_detail
-    description: "Get delivery details by order ID. Required: orderId."
+    description: "根据订单ID获取配送详情。必填：orderId。"
     handler: GetDeliveryDetail
 
   - name: create_delivery
-    description: "Create a new delivery record. Required: orderId, driverId, startLocation, endLocation. Optional: status, estimatedTime."
+    description: "创建新的配送记录。必填：orderId、driverId、startLocation、endLocation。可选：status、estimatedTime。"
     handler: CreateDelivery
 
   - name: update_delivery_status
-    description: "Update delivery status. Required: orderId, status (0=pending, 1=in-transit, 2=delivered, 3=failed)."
+    description: "更新配送状态。必填：orderId、status（0=待配送，1=配送中，2=已送达，3=失败）。"
     handler: UpdateDeliveryStatus
 
   - name: update_delivery_address
-    description: "Update delivery address. Required: orderId, address, location."
+    description: "更新配送地址。必填：orderId、address、location。"
     handler: UpdateDeliveryAddress
 
   - name: add_delivery_review
-    description: "Add review for completed delivery. Required: orderId, rating (1-5), comment."
+    description: "为已完成配送添加评价。必填：orderId、rating（1-5）、comment。"
     handler: AddDeliveryReview
 
   - name: get_delivery_by_order
-    description: "Get delivery by order ID (alias for get_delivery_detail)."
+    description: "根据订单ID获取配送信息（get_delivery_detail 的别名）。"
     handler: GetDeliveryByOrder

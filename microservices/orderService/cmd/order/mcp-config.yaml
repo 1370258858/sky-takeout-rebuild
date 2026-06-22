@@ -7,48 +7,48 @@ server:
 tools:
   - name: create_order
     description: |
-      Create a takeout order. Two modes — pick exactly one:
+      创建外卖订单，二选一模式（不要混用参数）：
 
-      Mode 1 (goods list): cartId must be 0 or omitted. Required: goodIds, amount, addressBookId. Do NOT pass cartId.
-      Mode 2 (shopping cart): cartId must be non-zero. Required: cartId, addressBookId. Do NOT pass goodIds.
+      模式1（商品下单）：cartId 必须为 0 或不传。必填：goodIds、amount、addressBookId。不要传 cartId。
+      模式2（购物车下单）：cartId 必须为非 0。必填：cartId、addressBookId。不要传 goodIds。
 
-      userId is always optional — omit it or pass 0 and the server will prompt for it via Elicit.
-      Optional for both modes: remark, phone, address, userName, consignee, payMethod, estimatedDeliveryTime, packAmount, tablewareNumber, tablewareStatus.
+      userId 始终为可选：可以省略或传 0，服务端会通过 Elicit 交互补充。
+      两种模式通用可选字段：remark、phone、address、userName、consignee、payMethod、estimatedDeliveryTime、packAmount、tablewareNumber、tablewareStatus。
     handler: CreateOrder
 
   - name: create_cart
-    description: "Create cart items. Required: userId, goodIds, quantity. Optional: name, image, flavor, amount."
+    description: "创建购物车条目。必填：userId、goodIds、quantity。可选：name、image、flavor、amount。"
     handler: CreateCart
 
   - name: cart_detail
-    description: "Get shopping cart details. Required: userId."
+    description: "查看购物车详情。必填：userId。"
     handler: CartDetail
 
   - name: update_cart
-    description: "Update cart item quantity/flavor/amount. Required: userId, cartId, quantity."
+    description: "更新购物车条目数量/口味/金额。必填：userId、cartId、quantity。"
     handler: UpdateCart
 
   - name: delete_cart
-    description: "Delete cart items. Required: userId, cartId (or omit cartId to delete all)."
+    description: "删除购物车条目。必填：userId、cartId（或省略 cartId 表示删除全部）。"
     handler: DeleteCart
 
   - name: refund_order
-    description: "Refund a paid order. Required: order ID. Optional: reason."
+    description: "订单退款。必填：订单ID。可选：reason。"
     handler: RefundOrder
 
   - name: get_order_detail
-    description: "Get order details by order ID."
+    description: "根据订单ID获取订单详情。"
     handler: GetOrderDetail
 
   - name: cancel_order
-    description: "Cancel an order. Required: order ID. Optional: reason."
+    description: "取消订单。必填：订单ID。可选：reason。"
     handler: CancelOrder
 
   - name: pay_order
-    description: "Process order payment. Required: order ID, payStatus (1=success, 2=failed, 3=timeout)."
+    description: "处理订单支付。必填：订单ID、payStatus（1=成功，2=失败，3=超时）。"
     handler: PayOrder
 
   - name: list_orders
-    description: "List orders by user. Required: userId. Optional: status filter."
+    description: "按用户查询订单列表。必填：userId。可选：status 过滤。"
     handler: ListOrders
 
