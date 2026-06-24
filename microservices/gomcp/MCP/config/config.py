@@ -5,9 +5,12 @@ from pathlib import Path
 from openai import OpenAI
 
 # ---------------------------------------------------------------------------
-# 路由配置：从 pmcp/mcp_tool_routes.json 读取各服务 URL
+# 路由配置：从mcp_tool_routes.json 读取各服务 URL
+# 当前写法线程不安全，需要改进
 # ---------------------------------------------------------------------------
-_routes_path = Path(__file__).parent.parent.parent / "pmcp" / "mcp_tool_routes.json"
+
+_routes_path = Path(__file__).parent / "mcp_tool_routes.json"
+
 with open(_routes_path, "r") as _f:
     _json_data = json.load(_f)
 
@@ -26,10 +29,38 @@ def resolve_url(service_name: str) -> str:
 
 
 def get_seesion(service_name: str) -> list:
-    """根  据 service_name 从配置中解析实际 seession（优先读环境变量）"""
+    """根据 service_name 从配置中解析实际 session（优先读环境变量）"""
     cfg = _services_cfg.get(service_name, {})
     session_list = cfg.get("sessionList")
+    # 若配置中无 sessionList，返回空列表或默认值
+    if session_list is None:
+        return []
     return session_list
+
+# 会话落盘
+def save_session(service_name: str, session_id: str, history: list) -> None:
+    """保存对话历史到 mcp_tool_routes.json 中对应 session 的 data 字段。"""
+    cfg = _services_cfg.get(service_name, {})
+    session_list = cfg.get("sessionList", [])
+    if not isinstance(session_list, list):
+        session_list = []
+        cfg["sessionList"] = session_list
+
+
+    # 找到对应 sessionId 的 session，更新其 data 字段
+    for session in session_list:
+        if str(session.get("sessionId")) == session_id:
+            session["data"] = history
+            break
+    else:
+        session_list.append({"sessionId": session_id, "data": history})
+
+    # 将更新后的数据写回 JSON 文件
+    with open(_routes_path, "w", encoding="utf-8") as f:
+        json.dump(_json_data, f, ensure_ascii=False, indent=2)
+
+
+
 
 # ---------------------------------------------------------------------------
 # LLM 配置

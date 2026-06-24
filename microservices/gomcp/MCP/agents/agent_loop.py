@@ -4,11 +4,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# 将 MCP 根目录和 pmcp 加入搜索路径
 _MCP_ROOT = Path(__file__).parent.parent
-_PMCP_ROOT = _MCP_ROOT.parent / "pmcp"
 sys.path.insert(0, str(_MCP_ROOT))
-sys.path.insert(0, str(_PMCP_ROOT))
 
 from contextlib import AsyncExitStack
 
@@ -16,7 +13,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from config.config import get_seesion
 
-from a import (
+from core.unit import (
     normalize_mcp_result,
     mcp_tool_to_openai_schema,
     _parse_tool_arguments,
@@ -37,7 +34,7 @@ class AgentLoop:
         :param service_urls: {service_name: mcp_url} 映射表
         """
         self.service_urls = service_urls
-        self.memory = ConversationMemory(max_history=MODEL_MAX_HISTORY)
+        self.memory: Optional[ConversationMemory] = None
         self._sessions: Dict[str, ClientSession] = {}
         self._llm_tools: List[Dict] = []
         self._exit_stack: Optional[AsyncExitStack] = None
@@ -116,13 +113,17 @@ class AgentLoop:
         await self.init_sessions()
         await self.get_tools()
         # 默认第一个session
-        if session_id is None:
-            session_id = get_seesion("your_service_name")[0].sessionId
+        if session_id is  None:
+            session_list = get_seesion("order")
+            if  len(session_list) != 0:
+                session_id = session_list[0]["sessionId"]
+                print(f"使用默认会话: {session_id}")
+
         else :session_id = session_id
-        self.memory = ConversationMemory(session_id=session_id)
+        self.memory = ConversationMemory(session_id=session_id, max_history=MODEL_MAX_HISTORY)
         try:
             while True:
-                query = input("\n我是一个AI助手,有什么需求吗？").strip()
+                query = input(f"\n当前会话id：{session_id}\n我是一个AI助手,有什么需求吗？").strip()
                 if not query:
                     break
 
@@ -167,4 +168,5 @@ class AgentLoop:
 
         finally:
             if self._exit_stack:
+                self.memory.save_history("order")
                 await self._exit_stack.__aexit__(None, None, None)

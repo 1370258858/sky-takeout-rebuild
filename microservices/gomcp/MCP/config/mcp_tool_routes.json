@@ -1,0 +1,23 @@
+{
+  "services": {
+    "order": {
+      "urlEnv": "MCP_ORDER_SERVER_URL",
+      "defaultUrl": "http://127.0.0.1:8004/mcp",
+      "prefix": "order",
+      "tools": ["create_order"],
+      "sessionList":[{"sessionId":"1","data":[]},{"sessionId":"2","data":[]}]
+    },
+    "goods": {
+      "urlEnv": "MCP_GOODS_SERVER_URL",
+      "defaultUrl": "http://127.0.0.1:8003/mcp",
+      "prefix": "goods",
+      "tools": ["list_goods"]
+    },
+    "delivery": {
+      "urlEnv": "MCP_DELIVERY_SERVER_URL",
+      "defaultUrl": "http://127.0.0.1:8005/mcp",
+      "prefix": "delivery",
+      "tools": ["list_deliveries"]
+    }
+  }
+}

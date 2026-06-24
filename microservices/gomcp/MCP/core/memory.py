@@ -1,11 +1,12 @@
 # Session 管理：会话历史的增加与查找
 from typing import Dict, List, Optional
+from config.config import get_seesion, save_session
 
 
 class ConversationMemory:
     """轻量级会话记忆，维护多轮对话历史，并提供增删查能力。"""
 
-    def __init__(self, max_history: int = 10,session_id: str = None):
+    def __init__(self, max_history: int = 10, session_id: Optional[str] = None):
         """
         :param max_history: 保留最近 N 轮（每轮含 user+assistant），
                             超出后丢弃最早的条目（system message 由调用方注入，不在此管理）。
@@ -13,6 +14,22 @@ class ConversationMemory:
         self._history: List[Dict] = []
         self.max_history = max_history
         self._session_id = session_id
+
+        session_list = get_seesion("order")
+        if session_list and session_id is not None:
+            # 通过 session_id 从 session_list 中恢复历史数据
+            session = next(
+                (s for s in session_list if str(s.get("sessionId")) == str(session_id)),
+                None,
+            )
+            if session:
+                data = session.get("data", [])
+                if isinstance(data, list):
+                    self._history = data
+
+        # 启动恢复后立即裁剪，避免首轮 prompt 超出窗口
+        if len(self._history) > self.max_history:
+            self._history = self._history[-self.max_history :]
 
     # ------------------------------------------------------------------
     # 增
@@ -29,8 +46,8 @@ class ConversationMemory:
 
     def _append(self, entry: Dict) -> None:
         self._history.append(entry)
-        # 超出容量时，从头部裁剪（保留最近 max_history*2 条）
-        cap = self.max_history * 2
+        # 超出容量时，从头部裁剪（保留最近 max_history 条）
+        cap = self.max_history
         if len(self._history) > cap:
             self._history = self._history[-cap:]
 
@@ -62,7 +79,11 @@ class ConversationMemory:
         """返回完整历史（只读视图）。"""
         return list(self._history)
 
-
+    def save_history(self, service_name: str = "order") -> None:
+        """保存当前历史到持久化存储。"""
+        if self._session_id is None:
+            return
+        save_session(service_name, str(self._session_id), self.get_history())
 
     def __len__(self) -> int:
         return len(self._history)

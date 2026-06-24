@@ -3,7 +3,7 @@
 
 from mcp.types import ElicitResult
 
-
+# 导入agent loop 的回调模块
 async def elicitation_handler(context, params) -> ElicitResult:
     """处理 MCP 服务端发来的 Elicit 补充信息请求，在终端交互式采集用户输入"""
     print(f"\n[需要补充信息]: {params.message}")
