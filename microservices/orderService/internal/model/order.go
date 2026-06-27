@@ -97,6 +97,27 @@ type DeleteCartRequest struct {
 	CartID uint64 `json:"cartId"`
 }
 
+// UpdateFact defines a single fact update item returned by MCP tools.
+type UpdateFact struct {
+	Key        string `json:"key"`
+	Value      any    `json:"value"`
+	Confidence string `json:"confidence,omitempty"`
+	Source     string `json:"source,omitempty"`
+	UpdatedAt  string `json:"updated_at,omitempty"`
+}
+
+// OrderWithUpdateFacts flattens Order fields and updateFacts at the same level.
+type OrderWithUpdateFacts struct {
+	*Order
+	UpdateFacts []UpdateFact `json:"updateFacts,omitempty"`
+}
+
+// OrderCartWithUpdateFacts flattens OrderCart fields and updateFacts at the same level.
+type OrderCartWithUpdateFacts struct {
+	*OrderCart
+	UpdateFacts []UpdateFact `json:"updateFacts,omitempty"`
+}
+
 type OrderCart struct {
 	ID         uint64     `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 	Name       string     `json:"name" gorm:"column:name"`

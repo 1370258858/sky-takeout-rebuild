@@ -15,40 +15,82 @@ tools:
       userId 始终为可选：可以省略或传 0，服务端会通过 Elicit 交互补充。
       两种模式通用可选字段：remark、phone、address、userName、consignee、payMethod、estimatedDeliveryTime、packAmount、tablewareNumber、tablewareStatus。
     handler: CreateOrder
+    updateFacts: true
+    fact_scopes:
+    - order.id
+    - order.status
+    - order.created_at
+    - order.amount
+    - order.item_count
+    - delivery.estimated_time
+    - delivery.reserve_time
+
 
   - name: create_cart
     description: "创建购物车条目。必填：userId、goodIds、quantity。可选：name、image、flavor、amount。"
     handler: CreateCart
+    updateFacts: true
+    fact_scopes:
+      - order.status
+      - order.item_count
+      - order.amount
+      - budget.max
+      - preference.taste
 
   - name: cart_detail
     description: "查看购物车详情。必填：userId。"
     handler: CartDetail
+    updateFacts: false
+    fact_scopes: []
 
   - name: update_cart
     description: "更新购物车条目数量/口味/金额。必填：userId、cartId、quantity。"
     handler: UpdateCart
+    updateFacts: true
+    fact_scopes:
+      - order.status
+      - order.item_count
+      - order.amount
+      - preference.taste
 
   - name: delete_cart
     description: "删除购物车条目。必填：userId、cartId（或省略 cartId 表示删除全部）。"
     handler: DeleteCart
+    updateFacts: true
+    fact_scopes:
+      - order.status
+      - order.item_count
 
   - name: refund_order
     description: "订单退款。必填：订单ID。可选：reason。"
     handler: RefundOrder
+    updateFacts: true
+    fact_scopes:
+      - order.status
 
   - name: get_order_detail
     description: "根据订单ID获取订单详情。"
     handler: GetOrderDetail
+    updateFacts: false
+    fact_scopes: []
 
   - name: cancel_order
     description: "取消订单。必填：订单ID。可选：reason。"
     handler: CancelOrder
+    updateFacts: true
+    fact_scopes:
+      - order.status
 
   - name: pay_order
     description: "处理订单支付。必填：订单ID、payStatus（1=成功，2=失败，3=超时）。"
     handler: PayOrder
+    updateFacts: true
+    fact_scopes:
+      - order.status
 
   - name: list_orders
     description: "按用户查询订单列表。必填：userId。可选：status 过滤。"
     handler: ListOrders
+    updateFacts: false
+    fact_scopes: []
 

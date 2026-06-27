@@ -26,9 +26,11 @@ type MCPServerConfig struct {
 
 // MCPToolConfig represents a single tool configuration
 type MCPToolConfig struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Handler     string `yaml:"handler"`
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Handler     string   `yaml:"handler"`
+	UpdateFacts bool     `yaml:"updateFacts"`
+	FactScopes  []string `yaml:"fact_scopes"`
 }
 
 // LoadMCPConfig loads MCP configuration from a YAML file
