@@ -11,7 +11,7 @@ from openai import OpenAI
 
 _routes_path = Path(__file__).parent / "mcp_tool_routes.json"
 
-with open(_routes_path, "r") as _f:
+with open(_routes_path, "r", encoding="utf-8") as _f:
     _json_data = json.load(_f)
 
 _services_cfg: dict = _json_data.get("services", {})
@@ -68,8 +68,10 @@ def save_session(service_name: str, session_id: str, history: list) -> None:
 MODEL_NAME: str = os.getenv("MODEL_NAME", "deepseek-v4-pro")
 MODEL_MAX_HISTORY: int = int(os.getenv("MODEL_MAX_HISTORY", "10"))
 
+GET_INTENT_MODEL_NAME: str = os.getenv("GET_INTENT_MODEL_NAME", "qwen-turbo")
+
 llm = OpenAI(
-    api_key=os.getenv("LLM_API_KEY", "sk-3dad08434cf2403199dce62cd7c1b972"),
+    api_key=os.getenv("LLM_API_KEY", "sk-a073a0942a91406e85604f9a5f8e7664"),
     base_url=os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
 )
 
@@ -85,4 +87,17 @@ SYSTEM_PROMPT = (
     "创建订单时禁止臆造 userId。若用户未提供 userId，"
     "请在 create_order 参数中传 userId=0，由 MCP 服务端通过 Elicit 继续补充。"
     "工具返回后再给最终中文答复。"
+)
+
+GET_INTENT_PROMPT = (
+    "你是预算意图提取器。请只输出一个 JSON 对象，不要输出任何额外文字。"
+    "JSON schema: "
+    "{\"has_budget_intent\": bool, \"budget_max\": number|null, "
+    "\"budget_range\": {\"min\": number, \"max\": number}|null}."
+    "规则: "
+    "1) 若输入中有预算相关意图(如不要太贵/平价/实惠/不超过100/80到120)，has_budget_intent=true;"
+    "2) 若提取到上限，填 budget_max;"
+    "3) 若提取到范围，填 budget_range(min/max);"
+    "4) 无法确定的字段填 null;"
+    "5) 若完全无预算意图，返回 {\"has_budget_intent\": false, \"budget_max\": null, \"budget_range\": null}。"
 )

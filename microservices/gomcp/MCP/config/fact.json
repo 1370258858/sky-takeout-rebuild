@@ -1,0 +1,120 @@
+{
+  "users": [
+    {
+      "user_id": "u123",
+      "facts": {
+        "budget.max": {
+          "value": 80,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-24T10:00:00Z"
+        },
+        "delivery.time": {
+          "value": "2026-06-25 18:30",
+          "confidence": "HIGH",
+          "source": "api",
+          "updated_at": "2026-06-24T10:01:00Z"
+        },
+        "preference.general": {
+          "value": "米饭为主，少油",
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-24T10:02:00Z"
+        },
+        "order.created_at": {
+          "value": "2026-06-24T09:58:00Z",
+          "confidence": "HIGH",
+          "source": "api",
+          "updated_at": "2026-06-24T10:02:00Z"
+        },
+        "delivery.estimated_time": {
+          "value": "2026-06-24T11:00:00Z",
+          "confidence": "HIGH",
+          "source": "api",
+          "updated_at": "2026-06-24T10:03:00Z"
+        },
+        "order.status": {
+          "value": "CREATED",
+          "confidence": "HIGH",
+          "source": "api",
+          "updated_at": "2026-06-24T10:03:00Z"
+        },
+        "preference.taste": {
+          "value": "微辣",
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-24T10:04:00Z"
+        },
+        "contact.address_person": {
+          "value": {
+            "address": "上海市浦东新区张江路100号",
+            "contact": "张三",
+            "phone": "13800001234"
+          },
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-24T10:04:30Z"
+        }
+      }
+    },
+    {
+      "user_id": "u456",
+      "facts": {
+        "discription": "这是一份用户事实，有可行度更新时间等属性",
+        "budget.max": {
+          "value": 111.0,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": ""
+        },
+        "preference.taste": {
+          "value": "不辣",
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-23T19:31:00Z"
+        },
+        "order.status": {
+          "value": "DELIVERING",
+          "confidence": "HIGH",
+          "source": "api",
+          "updated_at": "2026-06-23T20:10:00Z"
+        },
+        "budget.has_range": {
+          "value": true,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": ""
+        },
+        "budget.min": {
+          "value": 81.0,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": ""
+        }
+      }
+    },
+    {
+      "user_id": "u_test",
+      "facts": {
+        "budget.min": {
+          "value": 80.0,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-27T16:29:52.520419"
+        },
+        "budget.max": {
+          "value": 120.0,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-27T16:29:52.521419"
+        },
+        "budget.has_range": {
+          "value": true,
+          "confidence": "HIGH",
+          "source": "user_input",
+          "updated_at": "2026-06-27T16:29:52.522419"
+        }
+      }
+    }
+  ]
+}
