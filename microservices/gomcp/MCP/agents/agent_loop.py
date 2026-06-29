@@ -5,28 +5,32 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
+from contextlib import AsyncExitStack
+
+from agents.graph_workflow import AgentGraphState, GraphWorkflowMixin
+from jsonschema import Draft202012Validator, ValidationError
+
 
 _MCP_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_MCP_ROOT))
 
-from contextlib import AsyncExitStack
-
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from config.config import get_seesion
+from logs.logger import Logger
+from request import IntentRequestBuilder , get_intent_request,get_request
 
 from core.unit import (
-    normalize_mcp_result,
     mcp_tool_to_openai_schema,
-    _parse_tool_arguments,
-    add_to_history,
 )
 from config.config import MODEL_NAME, GET_INTENT_MODEL_NAME,SYSTEM_PROMPT, GET_INTENT_PROMPT,llm, MODEL_MAX_HISTORY
 from core.memory import ConversationMemory, FactMemory
 from elicitation import elicitation_handler
 
 
-class AgentLoop:
+
+class AgentLoop(Logger, GraphWorkflowMixin):
     """
     封装了与多个 MCP 服务的会话初始化、工具加载、LLM 调用和工具分发逻辑。
     """
@@ -42,6 +46,15 @@ class AgentLoop:
         self._llm_tools: List[Dict] = []
         self._exit_stack: Optional[AsyncExitStack] = None
         self._llm_logger = self._init_llm_logger()
+        self._obs_context: Dict[str, Any] = {
+            "session_id": None,
+            "turn": 0,
+            "trace_id": "",
+            "node": "",
+        }
+        self._graph = self._build_graph()
+
+    
 
     def _init_llm_logger(self) -> logging.Logger:
         """初始化 LLM 调用日志，输出到 logs/llm_calls.log。"""
@@ -70,40 +83,6 @@ class AgentLoop:
             return json.loads(str(resp))
         except (TypeError, json.JSONDecodeError):
             return str(resp)
-
-    def _log_llm_call(self, messages: List[Dict], req: Dict, resp: Any = None, error: Optional[Exception] = None) -> None:
-        """记录每次 LLM 调用的上下文、token 用量与响应体。"""
-        entry = {
-            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "kind": "llm",
-            "model": req.get("model"),
-            "tool_choice": req.get("tool_choice"),
-            "context_message_count": len(messages),
-            "context_messages": messages,
-            "response": self._serialize_response(resp) if resp is not None else None,
-            "error": str(error) if error is not None else None,
-        }
-        self._llm_logger.info(json.dumps(entry, ensure_ascii=False))
-
-    def _log_tool_call(
-        self,
-        tool_name: str,
-        args: Dict[str, Any],
-        tool_call_id: Optional[str] = None,
-        result: Any = None,
-        error: Optional[Exception] = None,
-    ) -> None:
-        """记录每次 tool 调用的入参与结果。"""
-        entry = {
-            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "kind": "tool",
-            "tool_name": tool_name,
-            "tool_call_id": tool_call_id,
-            "args": args,
-            "result": self._serialize_response(result) if result is not None else None,
-            "error": str(error) if error is not None else None,
-        }
-        self._llm_logger.info(json.dumps(entry, ensure_ascii=False))
 
 
     # ------------------------------------------------------------------
@@ -136,6 +115,8 @@ class AgentLoop:
             all_tools.extend(mcp_tool_to_openai_schema(t) for t in raw_tools)
         self._llm_tools = all_tools
         return all_tools
+    
+    
     # 获取预算意图
     def _llm_get_intent_call(self, query: str):
         """调用 LLM 来获取用户输入中的意图。"""
@@ -143,39 +124,101 @@ class AgentLoop:
             {"role": "system", "content": GET_INTENT_PROMPT},
             {"role": "user", "content": query}
         ]
-        req: Dict = {
-            "model": GET_INTENT_MODEL_NAME,
-            "messages": messages,
-            "temperature": 0,
-        }
+        req = get_intent_request(messages)
         resp = llm.chat.completions.create(**req)
         self._log_llm_call(messages=messages, req=req, resp=resp)
-        return resp
 
-    def _extract_json_object(self, text: str) -> Optional[Dict[str, Any]]:
-        """从模型返回文本中提取第一个 JSON 对象。"""
-        if not text:
-            return None
-        text = text.strip()
-        try:
-            parsed = json.loads(text)
-            return parsed if isinstance(parsed, dict) else None
-        except json.JSONDecodeError:
-            pass
+        return None if not self._validate_response(resp, get_intent_request) else resp
+    
 
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end <= start:
+    
+    def _extract_payload_from_resp(self, resp: Any) -> Optional[Dict[str, Any]]:
+        """从 LLM 响应中提取有效载荷。
+            当前支持从 OpenAI API 响应中提取有效载荷。
+            当前只能校验resp JSON 格式是否正确。不能做简单JSON 格式修复
+        
+        """
+        content: Any = None
+        if isinstance(resp, dict):
+            content = resp
+        elif isinstance(resp, str):
+            content = resp
+        else:
+            try:
+                choice = resp.choices[0] if getattr(resp, "choices", None) else None
+                msg = choice.message if choice else None
+                content = msg.content if msg else None
+            except Exception:
+                return None
+
+        if not content:
             return None
+
+        if isinstance(content, dict):
+            return content
+
+        if isinstance(content, str):
+            # 先整体解析
+            try:
+                data = json.loads(content)
+                return data if isinstance(data, dict) else None
+            except json.JSONDecodeError:
+                pass
+
+            # 再尝试截取首尾 JSON 对象
+            start = content.find("{")
+            end = content.rfind("}")
+            if start >= 0 and end > start:
+                try:
+                    data = json.loads(content[start:end + 1])
+                    return data if isinstance(data, dict) else None
+                except json.JSONDecodeError:
+                    return None
+
+        return None
+
+
+    def _validate_response(
+            self,
+            resp: Any,
+            request_builder: IntentRequestBuilder) -> bool:
+        """按照 request_builder 的 response_format.json_schema.schema 校验响应。"""
+        """"校验 LLM 响应是否符合预期的 JSON Schema。"""
+        payload = self._extract_payload_from_resp(resp)
+        if not payload:
+            return False
+
+        # 从你已有的请求模板中拿 schema
+        req = request_builder([{"role": "system", "content": GET_INTENT_PROMPT}])
+        schema = (
+            req.get("response_format", {})
+            .get("json_schema", {})
+            .get("schema")
+        )
+        if not isinstance(schema, dict):
+            return False
+
         try:
-            parsed = json.loads(text[start : end + 1])
-            return parsed if isinstance(parsed, dict) else None
-        except json.JSONDecodeError:
-            return None
+            Draft202012Validator(schema).validate(payload)
+            return True
+        except ValidationError as e:
+            self._llm_logger.info(
+                json.dumps(
+                    {
+                        "kind": "response_validate",
+                        "status": "invalid",
+                        "error": e.message,
+                        "path": list(e.path),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return False
+
 
     def _apply_budget_intent_result(self, result_text: str) -> bool:
         """解析意图模型返回并在可用时写入预算事实。"""
-        payload = self._extract_json_object(result_text)
+        payload = self._extract_payload_from_resp(result_text)
         if not payload:
             return False
 
@@ -218,24 +261,21 @@ class AgentLoop:
     # ------------------------------------------------------------------
     # LLM 调用
     # ------------------------------------------------------------------
-    def _llm_call(self, tool_choice=None):
+    def _llm_call(self, tool_choice=None, extra_messages: Optional[List[Dict[str, Any]]] = None):
         """将当前内存中的历史与 system prompt 一起发给 LLM。"""
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             *self.memory.get_history(),
         ]
-        req: Dict = {
-            "model": MODEL_NAME,
-            "messages": messages,
-            "temperature": 0,
-            "tools": self._llm_tools,
-        }
+        if extra_messages:
+            messages.extend(extra_messages)
+        req = get_request(messages=messages)
         if tool_choice is not None:
             req["tool_choice"] = tool_choice
         try:
             resp = llm.chat.completions.create(**req)
             self._log_llm_call(messages=messages, req=req, resp=resp)
-            return resp
+            return None if not self._validate_response(resp, get_request) else resp
         except Exception as e:
             self._log_llm_call(messages=messages, req=req, error=e)
             raise
@@ -272,12 +312,15 @@ class AgentLoop:
 
         else :session_id = session_id
         self.memory = ConversationMemory(session_id=session_id, max_history=MODEL_MAX_HISTORY)
-        self.factMemory = FactMemory(user_id="u456")
+        self.factMemory = FactMemory(user_id=456)
         turn = 0
+        order_state = self.factMemory.get_fact("order.state", "Draft")
         try:
             while True:
                 turn = turn + 1
                 query = input(f"\n当前会话id：{session_id}\n我是一个AI助手,有什么需求吗？").strip()
+                trace_id = f"{session_id}-t{turn}-{uuid4().hex[:8]}"
+                self._set_obs_context(session_id=str(session_id), turn=turn, trace_id=trace_id, node="run")
                 if turn == 1:
                     # 首轮对话添加已知事实
                     fact_snapshot = self.factMemory.get_user()  # dict
@@ -285,78 +328,30 @@ class AgentLoop:
                     "FACTS_SNAPSHOT:\n"
                     + json.dumps(fact_snapshot, ensure_ascii=False, indent=2))
                     self.memory.add("system", fact_text)
+                state: AgentGraphState = {
+                    "query": query,
+                    "turn": turn,
+                    "order_state": order_state,
+                    "tool_calls": [],
+                    "last_tool_names": [],
+                    "tool_payloads": [],
+                    "runtime_tool_messages": [],
+                    "reply": "",
+                    "event": "NO_OP",
+                    "should_exit": False,
+                }
+                result = await self._graph.ainvoke(state)
+                self.memory.save_history("order")
+                self._log_op(op="session_persist", output_summary={"history_count": len(self.memory)})
 
-                # 添加事实
-                factresult =  self.factMemory.set_facts_from_user_input(query)
-                # 如果没提取到预算事实,但是提取到了预算意图词则调用llm提取
-                if not factresult[0] and  (self.factMemory.has_budget_intent(query)):
-                    # 调用llm提取预算并判断返回结果后写入事实
-                    print("检测到预算意图，调用LLM提取预算信息...")
-                    intentresp = self._llm_get_intent_call(query)
-                    intent_content = ""
-                    if intentresp.choices and intentresp.choices[0].message:
-                        intent_content = intentresp.choices[0].message.content or ""
-
-                    if self._apply_budget_intent_result(intent_content):
-                        print("预算意图提取成功，已写入预算事实。")
-                    else:
-                        print("预算意图提取未得到可用结构化结果。")
-
-                # 第一轮：LLM 判断是否调用工具
-                self.memory.add("user", query)
-                resp = self._llm_call()
-                choice = resp.choices[0] if resp.choices else None
-                tool_calls = (
-                    choice.message.tool_calls
-                    if choice and choice.message
-                    else None
-                ) 
-
-                if tool_calls:
-                    # 将 assistant tool_calls 迎入历史
-                    add_to_history(
-                        self.memory.get_history(), choice.message, tool_calls
-                    )
-                    # 执行每个工具调用
-                    for tc in tool_calls:
-                        args = _parse_tool_arguments(tc.function.arguments)
-                        try:
-                            tool_result = await self.call_tool_by_name(tc.function.name, args)
-                            self._log_tool_call(
-                                tool_name=tc.function.name,
-                                tool_call_id=tc.id,
-                                args=args,
-                                result=tool_result,
-                            )
-                        except Exception as e:
-                            self._log_tool_call(
-                                tool_name=tc.function.name,
-                                tool_call_id=tc.id,
-                                args=args,
-                                error=e,
-                            )
-                            raise
-                        payload = normalize_mcp_result(tool_result)
-                        # 是否需要更新事实，检测mcp 返回结果，如果含有待更新事实则更新agent侧的facts
-                        if "updateFacts" in payload:
-                            self.factMemory.set_facts(payload["updateFacts"])
-                        self.memory.add_raw(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc.id,
-                                "content": json.dumps(payload, ensure_ascii=False),
-                            }
-                        )
-
-                    # 根据工具结果再次问 LLM
-                    resp = self._llm_call()
-                    choice = resp.choices[0] if resp.choices else None
-
-                # 输出最终回复
-                if choice and choice.message:
-                    reply = choice.message.content or ""
-                    self.memory.add("assistant", reply)
+                order_state = result.get("order_state", order_state)
+                reply = result.get("reply", "")
+                if reply:
                     print(reply)
+
+                if result.get("should_exit", False):
+                    print(f"订单流程已结束，终态: {order_state}")
+                    break
 
         finally:
             if self._exit_stack:

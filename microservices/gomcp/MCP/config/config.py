@@ -4,6 +4,11 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from typing import Any, Dict, Optional
+import json
+from jsonschema import Draft202012Validator, ValidationError
+
+
 # ---------------------------------------------------------------------------
 # 路由配置：从mcp_tool_routes.json 读取各服务 URL
 # 当前写法线程不安全，需要改进
@@ -83,9 +88,17 @@ SYSTEM_PROMPT = (
     "若需要查看购物车请调用 cart_detail 工具。"
     "若需要修改购物车请调用 update_cart 工具。"
     "若需要删除购物车请调用 delete_cart 工具。"
-    "若需要查看商品列表请调用 list_goods 工具。"
     "创建订单时禁止臆造 userId。若用户未提供 userId，"
     "请在 create_order 参数中传 userId=0，由 MCP 服务端通过 Elicit 继续补充。"
+    
+    "输出必须严格遵循 JSON 对象格式，不得输出任何额外文本。"
+    "JSON 字段必须包含: action, confidence, reason。"
+    "可选字段: reply, tool_calls。"
+    "action 仅允许: tool_calls | reply | ask_user | error。"
+    "confidence 必须为 0 到 1 的数值。"
+    "当 action=tool_calls 时，tool_calls 必须非空且 reply 为空。"
+    "当 action=reply 或 ask_user 时，reply 必须非空且 tool_calls 为空。"
+    "当 action=error 时，tool_calls 必须为空。"
     "工具返回后再给最终中文答复。"
 )
 
@@ -101,3 +114,4 @@ GET_INTENT_PROMPT = (
     "4) 无法确定的字段填 null;"
     "5) 若完全无预算意图，返回 {\"has_budget_intent\": false, \"budget_max\": null, \"budget_range\": null}。"
 )
+

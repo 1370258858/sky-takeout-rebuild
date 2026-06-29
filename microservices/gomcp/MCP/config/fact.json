@@ -1,7 +1,7 @@
 {
   "users": [
     {
-      "user_id": "u123",
+      "user_id": 123,
       "facts": {
         "budget.max": {
           "value": 80,
@@ -58,14 +58,14 @@
       }
     },
     {
-      "user_id": "u456",
+      "user_id": 456,
       "facts": {
         "discription": "这是一份用户事实，有可行度更新时间等属性",
         "budget.max": {
-          "value": 111.0,
+          "value": 5.0,
           "confidence": "HIGH",
           "source": "user_input",
-          "updated_at": ""
+          "updated_at": "2026-06-28T13:32:09.463399"
         },
         "preference.taste": {
           "value": "不辣",
@@ -80,21 +80,27 @@
           "updated_at": "2026-06-23T20:10:00Z"
         },
         "budget.has_range": {
-          "value": true,
+          "value": false,
           "confidence": "HIGH",
           "source": "user_input",
-          "updated_at": ""
+          "updated_at": "2026-06-28T13:32:09.464395"
         },
         "budget.min": {
-          "value": 81.0,
+          "value": 20.0,
           "confidence": "HIGH",
           "source": "user_input",
-          "updated_at": ""
+          "updated_at": "2026-06-27T21:31:14.835615"
+        },
+        "order.state": {
+          "value": "Paid",
+          "confidence": "HIGH",
+          "source": "state_machine",
+          "updated_at": "2026-06-28T13:29:59.915644"
         }
       }
     },
     {
-      "user_id": "u_test",
+      "user_id": 999,
       "facts": {
         "budget.min": {
           "value": 80.0,
@@ -103,16 +109,16 @@
           "updated_at": "2026-06-27T16:29:52.520419"
         },
         "budget.max": {
-          "value": 120.0,
+          "value": 30.0,
           "confidence": "HIGH",
           "source": "user_input",
-          "updated_at": "2026-06-27T16:29:52.521419"
+          "updated_at": "2026-06-27T19:22:58.237414"
         },
         "budget.has_range": {
-          "value": true,
+          "value": false,
           "confidence": "HIGH",
           "source": "user_input",
-          "updated_at": "2026-06-27T16:29:52.522419"
+          "updated_at": "2026-06-27T19:22:58.238414"
         }
       }
     }
