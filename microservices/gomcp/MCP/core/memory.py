@@ -70,6 +70,49 @@ class ConversationMemory:
         """返回完整历史（只读视图）。"""
         return list(self._history)
 
+    def merge_tool_results(self, tool_results: List[Dict[str, Any]]) -> None:
+        """可读化地把工具返回按 tool_call_id 回填到最近一条 assistant.tool_calls 中。"""
+        if not tool_results:
+            return
+
+        by_id: Dict[str, Dict[str, Any]] = {}
+        for item in tool_results:
+            tcid = item.get("id")
+            if isinstance(tcid, str) and tcid:
+                by_id[tcid] = item
+
+        if not by_id:
+            return
+
+        # 优先回填最近一条 assistant tool_calls
+        for msg in reversed(self._history):
+            if msg.get("role") != "assistant":
+                continue
+            calls = msg.get("tool_calls")
+            if not isinstance(calls, list):
+                continue
+
+            updated = False
+            for tc in calls:
+                if not isinstance(tc, dict):
+                    continue
+                tcid = tc.get("id")
+                if not isinstance(tcid, str):
+                    continue
+                merged = by_id.get(tcid)
+                if not merged:
+                    continue
+
+                fn = tc.get("function")
+                if not isinstance(fn, dict):
+                    fn = {}
+                    tc["function"] = fn
+                fn["result"] = merged.get("result")
+                updated = True
+
+            if updated:
+                return
+
     def save_history(self, service_name: str = "order") -> None:
         """保存当前历史到持久化存储。"""
         if self._session_id is None:
@@ -83,10 +126,10 @@ class ConversationMemory:
 class FactMemory:
     """事实记忆：按用户以字典形式保存到 fact.json。"""
 
-    def __init__(self, user_id: Optional[str] = None, fact_file: Optional[Path] = None):
+    def __init__(self, user_id: Optional[int] = None, fact_file: Optional[Path] = None):
         self._fact_file = fact_file or (Path(__file__).parent.parent / "config" / "fact.json")
         self._doc: Dict[str, Any] = {"users": []}
-        self._current: Dict[str, Any] = {"user_id": "", "facts": {}}
+        self._current: Dict[str, Any] = {"user_id": 0, "facts": {}}
         self._load()
 
         if user_id is None:
@@ -95,11 +138,11 @@ class FactMemory:
                 self._current = users[0]
             return
 
-        found = self._find_user(str(user_id))
+        found = self._find_user(user_id)
         if found is not None:
             self._current = found
         else:
-            self._current = {"user_id": str(user_id), "facts": {}}
+            self._current = {"user_id": int(user_id), "facts": {}}
             self._doc.setdefault("users", []).append(self._current)
             # 新用户初始化时立即落盘，避免测试或后续流程读取不到 user_id。
             self._save()
@@ -125,16 +168,17 @@ class FactMemory:
         with open(self._fact_file, "w", encoding="utf-8") as f:
             json.dump(self._doc, f, ensure_ascii=False, indent=2)
 
-    def _find_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+    def _find_user(self, user_id: int) -> Optional[Dict[str, Any]]:
+        target = int(user_id)
         for user in self._doc.get("users", []):
-            if str(user.get("user_id")) == user_id:
+            if user.get("user_id") == target:
                 return user
         return None
 
     def get_user(self) -> Dict[str, Any]:
         """获取当前用户的完整记录。"""
         return {
-            "user_id": self._current.get("user_id", ""),
+            "user_id": self._current.get("user_id", 0),
             "facts": dict(self._current.get("facts", {})),
         }
 
