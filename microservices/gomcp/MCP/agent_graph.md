@@ -1,20 +1,28 @@
 # Agent Graph
 
-## 五大节点流程图
+## 7大节点流程图
 
 ```mermaid
 flowchart TD
-	S([START]) --> FE[Fact Extractor]
-	FE --> P[Planner]
+    S([START]) --> FE[Fact Extractor]
+    FE --> P[Planner]
 
-	P -->|tool_calls 存在| T[Tool]
-	P -->|tool_calls 不存在| TR[Transition]
+    P -->|tool_calls 存在| G[Guard]
+    P -->|tool_calls 不存在| TR[Transition]
 
-	T --> FU[Fact Update]
-	FU --> TR
+    G -->|通过| T[Tool]
+    G -->|拦截/无可执行工具| TR[Transition]
 
-	TR -->|route = planner| P
-	TR -->|route = end| E([END])
+    T -->|执行成功| FU[Fact Update]
+    T -->|should_retry = true| R[Recover]
+
+    FU --> TR
+
+    R -->|retry_times < max_retry| P
+    R -->|retry_times >= max_retry / ask_user or fallback| TR
+
+    TR -->|route = planner| P
+    TR -->|route = end| E([END])
 ```
 
 说明:

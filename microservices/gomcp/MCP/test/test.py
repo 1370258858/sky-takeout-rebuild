@@ -13,7 +13,7 @@ class TestFactMemoryIntentAndExtraction(unittest.TestCase):
     def setUp(self) -> None:
         # 直接使用项目内 fact.json，便于运行后直接观察落盘结果。
         self.fact_file = _MCP_ROOT / "config" / "fact.json"
-        self.memory = FactMemory(user_id="u_test", fact_file=self.fact_file)
+        self.memory = FactMemory(user_id=999, fact_file=self.fact_file)
 
     def tearDown(self) -> None:
         # 保留写入结果，便于人工检查。
@@ -44,7 +44,7 @@ class TestFactMemoryIntentAndExtraction(unittest.TestCase):
     #     self.assertEqual(self.memory.get_fact("budget.max"), "42 元")
 
     def test_set_facts_from_user_input_range(self) -> None:
-        text = "预算 80 到 120 元"
+        text = "12:30 前送达"
         has_budget, has_delivery = self.memory.set_facts_from_user_input(text)
 
     #     self.assertTrue(has_budget)

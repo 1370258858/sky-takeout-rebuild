@@ -318,7 +318,7 @@ class AgentLoop(Logger, GraphWorkflowMixin):
         try:
             while True:
                 turn = turn + 1
-                query = input(f"\n当前会话id：{session_id}\n我是一个AI助手,有什么需求吗？").strip()
+                query = input(f"\n当前会话id：{session_id}\n我是一个AI助手,有什么需求吗？\n 老样子来一单请输入1").strip()
                 trace_id = f"{session_id}-t{turn}-{uuid4().hex[:8]}"
                 self._set_obs_context(session_id=str(session_id), turn=turn, trace_id=trace_id, node="run")
                 if turn == 1:
