@@ -25,6 +25,8 @@ def get_request(messages: list = None) -> dict:
                     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                     "reason": {"type": "string", "minLength": 1},
                     "reply": {"type": "string"},
+                    "need_slang_retrieval": {"type": "boolean"},
+                    "slang_query": {"type": "string"},
                     "tool_calls": {
                         "type": "array",
                         "items": {

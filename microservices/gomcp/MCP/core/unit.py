@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Dict, Optional
 
 def normalize_mcp_result(result: Any) -> Any:
     """Return the model-facing payload from an MCP call result."""
@@ -38,6 +38,50 @@ def get_field(obj, *names, default=None):
         if hasattr(obj, n):
             return getattr(obj, n)
     return default
+
+
+def extract_json_dict(source: Any) -> Optional[Dict[str, Any]]:
+    """Extract a JSON object from a dict/string/OpenAI-like response."""
+    if source is None:
+        return None
+
+    if isinstance(source, dict):
+        return source
+
+    content: Any = source
+    if not isinstance(source, str):
+        try:
+            choice = source.choices[0] if getattr(source, "choices", None) else None
+            message = choice.message if choice else None
+            content = message.content if message else None
+        except Exception:
+            content = None
+
+    if not content:
+        return None
+
+    if isinstance(content, dict):
+        return content
+
+    if not isinstance(content, str):
+        return None
+
+    try:
+        data = json.loads(content)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    start = content.find("{")
+    end = content.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(content[start : end + 1])
+            return data if isinstance(data, dict) else None
+        except json.JSONDecodeError:
+            return None
+
+    return None
 
 
 # ============ 步骤 3: 工具转换函数 ============

@@ -115,3 +115,17 @@ GET_INTENT_PROMPT = (
     "5) 若完全无预算意图，返回 {\"has_budget_intent\": false, \"budget_max\": null, \"budget_range\": null}。"
 )
 
+SIMMER_INTENT_PROMPT = (
+    "你是一个订单意图相似度判别器。请判断用户输入是否与“老样子再来一单 / 再来一单 / 按上次一样下单”"
+    "这一类预制意图语义相近。"
+    "只输出 JSON，不要输出任何额外文字。"
+    "JSON schema: {"
+    '"is_similar": boolean, '
+    '"confidence": number, '
+    '"reason": string'
+    "}."
+    "判断标准："
+    "1) 用户表达的是复用上次订单、照旧下单、按历史订单下单、再来一单；"
+    "2) 即使措辞口语化、黑话化、略有省略，只要核心语义仍是复用历史订单，就判定为 true；"
+    "3) 如果只是普通下单、推荐、咨询优惠、换口味、点别的菜，不算相似。"
+)

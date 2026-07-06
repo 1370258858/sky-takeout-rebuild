@@ -1,0 +1,17 @@
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: gomcp-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ALLOW_RESET: "FALSE"
+    volumes:
+      - chroma-data:/chroma/chroma
+
+volumes:
+  chroma-data:
+    name: gomcp-chroma-data

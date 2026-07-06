@@ -2,12 +2,13 @@ import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
-from typing import Any, Dict, List, Literal, Optional, TypedDict
+from typing import Any, Dict, List, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
 from jsonschema import Draft202012Validator, ValidationError
 
 from core.unit import _parse_tool_arguments, normalize_mcp_result
+from rag.retrieve import SlangRetrievalMixin
 from .preset_flows import finalize_preset_state, resolve_preset_state
 
 
@@ -30,13 +31,23 @@ class AgentGraphState(TypedDict, total=False):
     last_tool_names: List[str]
     tool_payloads: List[Any]
     runtime_tool_messages: List[Dict[str, Any]]
+    need_slang_retrieval: bool
+    slang_retrieval_done: bool
+    slang_query: str
+    slang_tool_calls: List[Any]
+    slang_tool_payloads: List[Any]
+    slang_retrieval_candidates: List[Dict[str, Any]]
+    slang_selected_sku: str
+    slang_selected_product: str
+    slang_retrieval_confidence: float
     reply: str
     should_exit: bool
     should_retry: bool
     retry_reason: RetryInfo
 
 
-class GraphWorkflowMixin:
+class GraphWorkflowMixin(SlangRetrievalMixin):
+
     def _tool_call_name(self, tc: Any) -> str:
         if isinstance(tc, dict):
             fn = tc.get("function")
@@ -138,7 +149,9 @@ class GraphWorkflowMixin:
         next_state = table.get(state, {}).get(event)
         return next_state if next_state is not None else state
 
-    def _route_after_planner(self, state: AgentGraphState) -> Literal["guard", "transition"]:
+    def _route_after_planner(self, state: AgentGraphState) -> Literal["guard", "retrieval", "transition"]:
+        if state.get("need_slang_retrieval", False) and not state.get("slang_retrieval_done", False):
+            return "retrieval"
         tool_calls = state.get("tool_calls") or []
         return "guard" if tool_calls else "transition"
 
@@ -151,6 +164,12 @@ class GraphWorkflowMixin:
             return "recover"
   
         return "fact_update"
+
+    def _route_after_retrieval(self, state: AgentGraphState) -> Literal["planner", "recover"]:
+        if state.get("should_retry", False):
+            return "recover"
+        return "planner"
+
 
     def _route_after_recover(self, state: AgentGraphState) -> Literal["planner", "transition"]:
         # 有回复时直接走 transition 收尾；否则继续回 planner 重试。
@@ -186,8 +205,10 @@ class GraphWorkflowMixin:
                     print("LLM预算意图提取成功，已写入预算事实。")
                 else:
                     print("LLM预算意图提取未得到可用结构化结果。")
+        # 代码扩展为 解析送达时间意图/等用户意图
 
         self.memory.add("user", query)
+        # 如果有预设意图，则直接返回预设状态 ，走快流程
         preset_state = resolve_preset_state(query, self._resolve_user_id, self._build_tool_call)
         if preset_state:
             self._log_op(
@@ -213,6 +234,15 @@ class GraphWorkflowMixin:
             "intent_source": "llm",
             "preset_intent": "",
             "preset_stage": "",
+            "need_slang_retrieval": False,
+            "slang_retrieval_done": False,
+            "slang_query": query,
+            "slang_tool_calls": [],
+            "slang_tool_payloads": [],
+            "slang_retrieval_candidates": [],
+            "slang_selected_sku": "",
+            "slang_selected_product": "",
+            "slang_retrieval_confidence": 0.0,
             "tool_calls": [],
             "last_tool_names": [],
             "tool_payloads": [],
@@ -283,7 +313,24 @@ class GraphWorkflowMixin:
                 "reply": "",
             }
         choice = resp.choices[0] if resp.choices else None
+        payload = self._extract_payload_from_resp(resp) if hasattr(self, "_extract_payload_from_resp") else {}
+        payload = payload if isinstance(payload, dict) else {}
         tool_calls = choice.message.tool_calls if choice and choice.message else None
+
+        need_slang_retrieval = bool(payload.get("need_slang_retrieval", False))
+        slang_query = payload.get("slang_query") if isinstance(payload.get("slang_query"), str) else (state.get("query") or "")
+
+        if not tool_calls and isinstance(payload.get("tool_calls"), list):
+            structured_tool_calls: List[Any] = []
+            for item in payload.get("tool_calls", []):
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name")
+                arguments = item.get("arguments")
+                if isinstance(name, str) and isinstance(arguments, dict):
+                    structured_tool_calls.append(self._build_tool_call(name, arguments))
+            if structured_tool_calls:
+                tool_calls = structured_tool_calls
 
         if tool_calls:
             memory_tool_calls: List[Dict[str, Any]] = []
@@ -315,6 +362,9 @@ class GraphWorkflowMixin:
                 },
             )
             return {
+                "need_slang_retrieval": need_slang_retrieval,
+                "slang_query": slang_query,
+                "slang_retrieval_done": False,
                 "tool_calls": list(tool_calls),
                 "runtime_tool_messages": [],
                 "reply": "",
@@ -336,6 +386,9 @@ class GraphWorkflowMixin:
         )
 
         return {
+            "need_slang_retrieval": need_slang_retrieval,
+            "slang_query": slang_query,
+            "slang_retrieval_done": False,
             "tool_calls": [],
             "runtime_tool_messages": [],
             "reply": reply,
@@ -628,10 +681,11 @@ class GraphWorkflowMixin:
     
 
     def _build_graph(self):
-        """构建七节点 LangGraph：FactExtractor -> Planner -> Guard -> Tool -> FactUpdate/Recover -> Transition。"""
+        """构建主图：FactExtractor -> Planner -> Retrieval/Guard -> Tool -> FactUpdate/Recover -> Transition。"""
         graph = StateGraph(AgentGraphState)
         graph.add_node("fact_extractor", self._node_fact_extractor)
         graph.add_node("planner", self._node_planner)
+        graph.add_node("retrieval", self._node_slang_retrieval)
         graph.add_node("guard", self._node_guard)
         graph.add_node("tool", self._node_tool)
         graph.add_node("fact_update", self._node_fact_update)
@@ -646,8 +700,17 @@ class GraphWorkflowMixin:
             "planner",
             self._route_after_planner,
             {
+                "retrieval": "retrieval",
                 "guard": "guard",
                 "transition": "transition",
+            },
+        )
+        graph.add_conditional_edges(
+            "retrieval",
+            self._route_after_retrieval,
+            {
+                "planner": "planner",
+                "recover": "recover",
             },
         )
         graph.add_conditional_edges(

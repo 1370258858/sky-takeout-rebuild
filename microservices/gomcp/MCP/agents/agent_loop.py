@@ -22,6 +22,7 @@ from logs.logger import Logger
 from request import IntentRequestBuilder , get_intent_request,get_request
 
 from core.unit import (
+    extract_json_dict,
     mcp_tool_to_openai_schema,
 )
 from config.config import MODEL_NAME, GET_INTENT_MODEL_NAME,SYSTEM_PROMPT, GET_INTENT_PROMPT,llm, MODEL_MAX_HISTORY
@@ -133,49 +134,8 @@ class AgentLoop(Logger, GraphWorkflowMixin):
 
     
     def _extract_payload_from_resp(self, resp: Any) -> Optional[Dict[str, Any]]:
-        """从 LLM 响应中提取有效载荷。
-            当前支持从 OpenAI API 响应中提取有效载荷。
-            当前只能校验resp JSON 格式是否正确。不能做简单JSON 格式修复
-        
-        """
-        content: Any = None
-        if isinstance(resp, dict):
-            content = resp
-        elif isinstance(resp, str):
-            content = resp
-        else:
-            try:
-                choice = resp.choices[0] if getattr(resp, "choices", None) else None
-                msg = choice.message if choice else None
-                content = msg.content if msg else None
-            except Exception:
-                return None
-
-        if not content:
-            return None
-
-        if isinstance(content, dict):
-            return content
-
-        if isinstance(content, str):
-            # 先整体解析
-            try:
-                data = json.loads(content)
-                return data if isinstance(data, dict) else None
-            except json.JSONDecodeError:
-                pass
-
-            # 再尝试截取首尾 JSON 对象
-            start = content.find("{")
-            end = content.rfind("}")
-            if start >= 0 and end > start:
-                try:
-                    data = json.loads(content[start:end + 1])
-                    return data if isinstance(data, dict) else None
-                except json.JSONDecodeError:
-                    return None
-
-        return None
+        """从 LLM 响应中提取有效载荷。"""
+        return extract_json_dict(resp)
 
 
     def _validate_response(

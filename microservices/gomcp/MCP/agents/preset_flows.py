@@ -1,5 +1,8 @@
 from typing import Any, Callable, Dict, List, Optional
 
+from config.config import GET_INTENT_MODEL_NAME, SIMMER_INTENT_PROMPT, llm
+from core.unit import extract_json_dict
+
 
 REPEAT_LAST_ORDER_INTENT = "repeat_last_order"
 REPEAT_LAST_ORDER_LOOKUP_STAGE = "lookup_last_order"
@@ -10,6 +13,36 @@ REPEAT_LAST_ORDER_DONE_STAGE = "done"
 def is_repeat_last_order_intent(query: str) -> bool:
     return (query or "").strip() == "1"
 
+
+def _call_simmer_classifier(query: str) -> Dict[str, Any]:
+    messages = [
+        {"role": "system", "content": SIMMER_INTENT_PROMPT},
+        {"role": "user", "content": query},
+    ]
+    resp = llm.chat.completions.create(
+        model=GET_INTENT_MODEL_NAME,
+        messages=messages,
+        temperature=0,
+        max_tokens=256,
+    )
+    content = ""
+    if getattr(resp, "choices", None):
+        choice = resp.choices[0]
+        if getattr(choice, "message", None):
+            content = choice.message.content or ""
+
+    payload = extract_json_dict(content) or {}
+    return payload
+
+
+# 默认指代 REPEAT_LAST_ORDER 类似的意图
+def is_simmer_last_order_intent(query: str) -> bool:
+    try:
+        payload = _call_simmer_classifier(query)
+        return bool(payload.get("is_similar"))
+    except Exception:
+        # 小模型异常时，宁可不误触发预制流程，避免把普通下单误判为复用历史订单。
+        return False
 
 def build_repeat_last_order_lookup_state(
     user_id: int,
@@ -114,7 +147,7 @@ def resolve_preset_state(
     resolve_user_id: Callable[[], int],
     build_tool_call: Callable[[str, Dict[str, Any]], Any],
 ) -> Optional[Dict[str, Any]]:
-    if is_repeat_last_order_intent(query):
+    if is_repeat_last_order_intent(query) or is_simmer_last_order_intent(query):
         return build_repeat_last_order_lookup_state(resolve_user_id(), build_tool_call)
     return None
 
